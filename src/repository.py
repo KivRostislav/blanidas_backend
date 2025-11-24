@@ -86,8 +86,8 @@ class CRUDRepository(Generic[ModelType]):
             "page": pagination.page,
             "pages": ceil(total / pagination.limit),
             "limit": pagination.limit,
-            "has_next": True,
-            "has_prev": True,
+            "has_next": (total - (pagination.offset + pagination.limit)) > 0,
+            "has_prev": pagination.page >= 2,
         }
 
     async def create(
@@ -98,13 +98,13 @@ class CRUDRepository(Generic[ModelType]):
             foreign_keys: Sequence[str] | None = None,
             preload: Sequence[str] | None = None,
     ) -> ModelType:
-        if not (await validate_unique_fields(self.model, data, database, unique)):
+        if unique and not (await validate_unique_fields(self.model, data, database, unique)):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"{self.model.__name__} with id the same fields already exists"
+                detail=f"{self.model.__name__} with the same fields already exists"
             )
 
-        if not (await validate_foreign_keys(self.model, data, database, foreign_keys)):
+        if foreign_keys and not (await validate_foreign_keys(self.model, data, database, foreign_keys)):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Some foreign keys does not exist"
@@ -133,7 +133,7 @@ class CRUDRepository(Generic[ModelType]):
         foreign_keys: Sequence[str] | None = None,
         preload: Sequence[str] | None = None,
     ) -> ModelType:
-        if not await validate_unique_fields(self.model, data, database, unique, exclude_ids=[id]):
+        if unique and not await validate_unique_fields(self.model, data, database, unique, exclude_ids=[id]):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"{self.model.__name__} with id the same fields already exists"
@@ -149,7 +149,7 @@ class CRUDRepository(Generic[ModelType]):
                 detail=f"{self.model.__name__} with id {id} does not exist"
             )
 
-        if not (await validate_foreign_keys(self.model, data, database, foreign_keys)):
+        if foreign_keys and not (await validate_foreign_keys(self.model, data, database, foreign_keys)):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Some foreign keys does not exist"

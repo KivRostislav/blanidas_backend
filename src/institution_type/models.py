@@ -14,7 +14,3 @@ class InstitutionTypeUpdate(BaseModel):
     id: int
     name: str
 
-class InstitutionTypeDelete(BaseModel):
-    id: int
-
-

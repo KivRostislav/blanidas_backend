@@ -3,12 +3,11 @@ from fastapi.params import Depends
 
 from src.database import DatabaseSession
 
-from src.institution_type.models import InstitutionTypeInfo, InstitutionTypeCreate, InstitutionTypeFilters, \
-    InstitutionTypeUpdate, InstitutionTypeDelete
+from src.institution_type.models import InstitutionTypeInfo, InstitutionTypeCreate, InstitutionTypeFilters, InstitutionTypeUpdate
 from src.institution_type.services import InstitutionTypeServices
 from src.pagination import Pagination, PaginationResponse
 
-router = APIRouter(prefix="/institution-type", tags=["Institution Type"])
+router = APIRouter(prefix="/institution-types", tags=["Institution Type"])
 services = InstitutionTypeServices()
 
 @router.get("/", response_model=PaginationResponse[InstitutionTypeInfo])
@@ -46,12 +45,6 @@ async def update_institution_type_endpoint(
         unique=["name"]
     )
 
-@router.delete("/", response_model=None)
-async def delete_institution_type_endpoint(
-        model: InstitutionTypeDelete,
-        database: DatabaseSession,
-) -> None:
-    return await services.delete(
-        id=model.id,
-        database=database
-    )
+@router.delete("/{id}", response_model=None)
+async def delete_institution_type_endpoint(id: int, database: DatabaseSession) -> None:
+    return await services.delete(id=id, database=database)

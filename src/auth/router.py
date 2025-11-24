@@ -10,8 +10,8 @@ from src.auth.models import UserLogin, UserCreate, ScopesRead, TokenInfo, UserUp
 from src.auth.schemas import Role, User, Scopes
 from src.database import DatabaseSession
 from src.config import Settings
-import src.auth.services as services
 from src.models import Pagination
+import src.auth.services as services
 
 router = APIRouter(prefix="/users", tags=["Users"])
 

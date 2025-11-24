@@ -57,12 +57,13 @@ async def validate_unique_fields(
     for field in unique:
         if field in data and hasattr(model_type, field):
             conditions.append(getattr(model_type, field) == data[field])
+    stmt = select(model_type).where(or_(*conditions))
     exclude_conditions = []
     if exclude_ids and hasattr(model_type, "id"):
         for exclude_id in exclude_ids:
             exclude_conditions.append(getattr(model_type, "id") != exclude_id)
+        stmt = stmt.where(and_(*exclude_conditions))
 
-    stmt = select(model_type).where(or_(*conditions)).where(and_(*exclude_conditions))
     result = await database.execute(stmt)
     obj = result.scalars().first()
     return not bool(obj)
