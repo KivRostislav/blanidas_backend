@@ -9,7 +9,7 @@ from src.manufacturer.models import ManufacturerInfo, ManufacturerFilters, Manuf
 from src.manufacturer.services import ManufacturerServices
 from src.pagination import PaginationResponse
 
-router = APIRouter(prefix="/manufacturer", tags=["Manufacturer"])
+router = APIRouter(prefix="/manufacturers", tags=["Manufacturer"])
 services = ManufacturerServices()
 
 @router.get("/", response_model=PaginationResponse[ManufacturerInfo])
@@ -47,12 +47,6 @@ async def update_manufacturer_endpoint(
         unique=["name"]
     )
 
-@router.delete("/", response_model=None)
-async def delete_manufacturer_endpoint(
-        model: ManufacturerDelete,
-        database: DatabaseSession,
-) -> None:
-    return await services.delete(
-        id=model.id,
-        database=database
-    )
+@router.delete("/{id}", response_model=None)
+async def delete_manufacturer_endpoint(id: int, database: DatabaseSession) -> None:
+    return await services.delete(id=id, database=database)

@@ -8,7 +8,7 @@ from src.equipment_model.services import EquipmentModelServices
 from src.pagination import PaginationResponse, Pagination
 
 
-router = APIRouter(prefix="/equipment-model", tags=["Equipment Model"])
+router = APIRouter(prefix="/equipment-models", tags=["Equipment Model"])
 services = EquipmentModelServices()
 
 @router.get("/", response_model=PaginationResponse[EquipmentModelInfo])
@@ -46,12 +46,6 @@ async def update_equipment_model_endpoint(
         unique=["name"]
     )
 
-@router.delete("/", response_model=None)
-async def delete_equipment_model_endpoint(
-        model: EquipmentModelDelete,
-        database: DatabaseSession,
-) -> None:
-    return await services.delete(
-        id=model.id,
-        database=database
-    )
+@router.delete("/{id}", response_model=None)
+async def delete_equipment_model_endpoint(id: int, database: DatabaseSession) -> None:
+    return await services.delete(id=id, database=database)

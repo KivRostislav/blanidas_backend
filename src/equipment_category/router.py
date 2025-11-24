@@ -8,7 +8,7 @@ from src.pagination import PaginationResponse, Pagination
 from src.database import DatabaseSession
 
 
-router = APIRouter(prefix="/equipment-category", tags=["Equipment Category"])
+router = APIRouter(prefix="/equipment-categories", tags=["Equipment Category"])
 services = EquipmentCategoryServices()
 
 @router.get("/", response_model=PaginationResponse[EquipmentCategoryInfo])
@@ -46,12 +46,6 @@ async def update_equipment_category_endpoint(
         unique=["name"]
     )
 
-@router.delete("/", response_model=None)
-async def delete_equipment_category_endpoint(
-        model: EquipmentCategoryDelete,
-        database: DatabaseSession,
-) -> None:
-    return await services.delete(
-        id=model.id,
-        database=database
-    )
+@router.delete("/{id}", response_model=None)
+async def delete_equipment_category_endpoint(id: int, database: DatabaseSession) -> None:
+    return await services.delete(id=id, database=database)

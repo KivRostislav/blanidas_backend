@@ -80,14 +80,15 @@ class CRUDRepository(Generic[ModelType]):
         result = await database.execute(stmt)
         items = result.scalars().all()
 
+        total_pages = max(1, ceil(total / pagination.limit))
         return {
             "items": items,
             "total": total,
             "page": pagination.page,
-            "pages": ceil(total / pagination.limit),
+            "pages": total_pages,
             "limit": pagination.limit,
-            "has_next": (total - (pagination.offset + pagination.limit)) > 0,
-            "has_prev": pagination.page >= 2,
+            "has_next": pagination.page < total_pages,
+            "has_prev": pagination.page > 1,
         }
 
     async def create(

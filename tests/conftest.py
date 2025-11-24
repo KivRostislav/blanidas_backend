@@ -1,22 +1,37 @@
-
 import pytest
 import pytest_asyncio
-
-from typing import Generator
 
 from httpx import AsyncClient, ASGITransport
 from polyfactory.pytest_plugin import register_fixture
 
+from src.equipment_category.schemas import EquipmentCategory
+from src.equipment_model.schemas import EquipmentModel
 from src.main import app
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from src.database import BaseDatabaseModel, get_db_session
+from tests.factories.equipment_category import EquipmentCategoryCreateFactory, EquipmentCategoryUpdateFactory, \
+    EquipmentCategoryORMFactory
+from tests.factories.equipment_model import EquipmentModelORMFactory, EquipmentModelUpdateFactory, \
+    EquipmentModelCreateFactory
 
-import tests.factories
-from tests.factories.institution_type import InstitutionTypeUpdateFactory, InstitutionTypeCreateFactory, InstitutionTypeORMFactory
+from tests.factories.institution_type import InstitutionTypeCreateFactory, InstitutionTypeUpdateFactory, InstitutionTypeORMFactory
+from tests.factories.manufacturer import ManufacturerCreateFactory, ManufacturerUpdateFactory, ManufacturerORMFactory
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+
+register_fixture(ManufacturerCreateFactory)
+register_fixture(ManufacturerUpdateFactory)
+register_fixture(ManufacturerORMFactory)
+
+register_fixture(EquipmentModelCreateFactory)
+register_fixture(EquipmentModelUpdateFactory)
+register_fixture(EquipmentModelORMFactory)
+
+register_fixture(EquipmentCategoryCreateFactory)
+register_fixture(EquipmentCategoryUpdateFactory)
+register_fixture(EquipmentCategoryORMFactory)
 
 register_fixture(InstitutionTypeCreateFactory)
 register_fixture(InstitutionTypeUpdateFactory)
@@ -48,3 +63,4 @@ def overwrite_dependencies(session):
     app.dependency_overrides[get_db_session] = lambda: session
     yield
     app.dependency_overrides.clear()
+

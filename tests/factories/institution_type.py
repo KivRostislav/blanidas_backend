@@ -13,4 +13,3 @@ class InstitutionTypeCreateFactory(ModelFactory[InstitutionTypeCreate]):
 
 class InstitutionTypeUpdateFactory(ModelFactory[InstitutionTypeUpdate]):
     pass
-
