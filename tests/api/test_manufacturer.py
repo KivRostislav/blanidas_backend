@@ -18,6 +18,7 @@ async def test_get_manufacturer_list_endpoint(
     await general_test_list_endpoint(
         client=client,
         session=session,
+        model_type=Manufacturer,
         orm_factory=manufacturer_orm_factory,
         url="/manufacturers/",
         page=3,
@@ -36,7 +37,7 @@ async def test_create_manufacturer_endpoint(
         session=session,
         create_factory=manufacturer_create_factory,
         url="/manufacturers/",
-        model=Manufacturer,
+        model_type=Manufacturer,
     )
 
 @pytest.mark.asyncio
@@ -52,7 +53,7 @@ async def test_update_manufacturer_endpoint(
         orm_factory=manufacturer_orm_factory,
         update_factory=manufacturer_update_factory,
         url="/manufacturers/",
-        model=Manufacturer,
+        model_type=Manufacturer,
     )
 
 

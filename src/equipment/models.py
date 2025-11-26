@@ -1,6 +1,6 @@
 from datetime import date
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer, field_validator
 
 from src.equipment_category.models import EquipmentCategoryInfo
 from src.equipment_model.models import EquipmentModelInfo
@@ -17,6 +17,10 @@ class EquipmentInfo(BaseModel):
     equipment_model: EquipmentModelInfo | None = None
     equipment_category: EquipmentCategoryInfo | None = None
     manufacturer: ManufacturerInfo | None = None
+
+    @field_serializer('installed')
+    def serialize_my_date(self, dt: date) -> str:
+        return dt.strftime('%Y-%m-%d')
 
 class EquipmentFilters(BaseModel):
     name__like: str | None = None
@@ -35,7 +39,12 @@ class EquipmentCreate(BaseModel):
     equipment_category_id: int
     manufacturer_id: int
 
+    @field_serializer('installed')
+    def serialize_my_date(self, dt: date) -> str:
+        return dt.isoformat()
+
 class EquipmentUpdate(BaseModel):
+    id: int
     name: str | None = None
     serial_number: str | None = None
     institution_id: int | None = None
@@ -43,6 +52,10 @@ class EquipmentUpdate(BaseModel):
     equipment_model_id: int | None = None
     equipment_category_id: int | None = None
     manufacturer_id: int | None = None
+
+    @field_serializer('installed')
+    def serialize_my_date(self, dt: date) -> str:
+        return dt.strftime('%Y-%m-%d')
 
 class EquipmentDelete(BaseModel):
     id: int

@@ -17,7 +17,8 @@ from src.institution_type.router import router as institution_type_router
 from src.equipment_model.router import router as equipment_model_router
 from src.equipment_category.router import router as equipment_category_router
 from src.manufacturer.router import router as manufacturer_router
-from src.equipment.router import router as equipment_schemas
+from src.supplier.router import router as supplier_router
+from src.equipment.router import router as equipment_router
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -55,10 +56,11 @@ app.include_router(institution_type_router)
 app.include_router(equipment_model_router)
 app.include_router(equipment_category_router)
 app.include_router(manufacturer_router)
-app.include_router(equipment_schemas)
+app.include_router(equipment_router)
 
 app.include_router(auth_router)
 app.include_router(institution_type_router)
+app.include_router(supplier_router)
 
 
 

@@ -8,6 +8,7 @@ from src.equipment_category.schemas import EquipmentCategory
 from src.equipment_model.schemas import EquipmentModel
 from src.institution.schemas import Institution
 from src.manufacturer.schemas import Manufacturer
+from src.models import StringToDate
 
 
 class Equipment(BaseDatabaseModel):
@@ -16,7 +17,7 @@ class Equipment(BaseDatabaseModel):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column()
     serial_number: Mapped[str] = mapped_column()
-    installed: Mapped[date] = mapped_column()
+    installed: Mapped[date] = mapped_column(StringToDate)
 
     institution_id: Mapped[int] = mapped_column(ForeignKey("institution.id"))
     institution: Mapped["Institution"] = relationship(back_populates="equipment")

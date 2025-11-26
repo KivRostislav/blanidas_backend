@@ -19,6 +19,7 @@ async def test_get_equipment_model_list_endpoint(
     await general_test_list_endpoint(
         client=client,
         session=session,
+        model_type=EquipmentModel,
         orm_factory=equipment_model_orm_factory,
         url="/equipment-models/",
         page=3,
@@ -39,7 +40,7 @@ async def test_create_equipment_model_endpoint(
         session=session,
         create_factory=equipment_model_create_factory,
         url="/equipment-models/",
-        model=EquipmentModel,
+        model_type=EquipmentModel,
     )
 
 @pytest.mark.asyncio
@@ -55,7 +56,7 @@ async def test_update_equipment_model_endpoint(
         orm_factory=equipment_model_orm_factory,
         update_factory=equipment_model_update_factory,
         url="/equipment-models/",
-        model=EquipmentModel,
+        model_type=EquipmentModel,
     )
 
 

@@ -8,18 +8,21 @@ from src.equipment_category.schemas import EquipmentCategory
 from src.equipment_model.schemas import EquipmentModel
 from src.main import app
 
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine, AsyncSession
 
 from src.database import BaseDatabaseModel, get_db_session
+from tests.factories.equipment import EquipmentORMFactory, EquipmentUpdateFactory, EquipmentCreateFactory
 from tests.factories.equipment_category import EquipmentCategoryCreateFactory, EquipmentCategoryUpdateFactory, \
     EquipmentCategoryORMFactory
 from tests.factories.equipment_model import EquipmentModelORMFactory, EquipmentModelUpdateFactory, \
     EquipmentModelCreateFactory
 
 from tests.factories.institution_type import InstitutionTypeCreateFactory, InstitutionTypeUpdateFactory, InstitutionTypeORMFactory
+from tests.factories.institution import InstitutionCreateFactory, InstitutionUpdateFactory, InstitutionORMFactory
 from tests.factories.manufacturer import ManufacturerCreateFactory, ManufacturerUpdateFactory, ManufacturerORMFactory
+from tests.factories.supplier import SupplierCreateFactory, SupplierUpdateFactory, SupplierORMFactory
 
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+TEST_DATABASE_URL = "sqlite+aiosqlite:///./test.db"
 
 register_fixture(ManufacturerCreateFactory)
 register_fixture(ManufacturerUpdateFactory)
@@ -37,6 +40,18 @@ register_fixture(InstitutionTypeCreateFactory)
 register_fixture(InstitutionTypeUpdateFactory)
 register_fixture(InstitutionTypeORMFactory)
 
+register_fixture(InstitutionCreateFactory)
+register_fixture(InstitutionUpdateFactory)
+register_fixture(InstitutionORMFactory)
+
+register_fixture(EquipmentCreateFactory)
+register_fixture(EquipmentUpdateFactory)
+register_fixture(EquipmentORMFactory)
+
+register_fixture(SupplierCreateFactory)
+register_fixture(SupplierUpdateFactory)
+register_fixture(SupplierORMFactory)
+
 @pytest_asyncio.fixture(scope="session")
 async def engine():
     engine = create_async_engine(TEST_DATABASE_URL)
@@ -49,9 +64,22 @@ async def engine():
 
 @pytest_asyncio.fixture(scope="function")
 async def session(engine):
-    session_maker = async_sessionmaker(engine, expire_on_commit=False)
-    async with session_maker() as session:
-        yield session
+    async with engine.connect() as connection:
+        tx = await connection.begin()
+
+        async_session = async_sessionmaker(
+            bind=connection,
+            class_=AsyncSession,
+            expire_on_commit=False,
+        )
+
+        session = async_session()
+
+        try:
+            yield session
+        finally:
+            await session.rollback()
+            await session.close()
 
 @pytest_asyncio.fixture(scope="module")
 async def client():

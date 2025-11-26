@@ -2,6 +2,7 @@ from pydantic import EmailStr, BaseModel
 from pydantic_extra_types.phone_numbers import PhoneNumber
 
 from src.institution_type.models import InstitutionTypeInfo
+from src.models import UkrainianPhoneNumber
 
 
 class InstitutionInfo(BaseModel):

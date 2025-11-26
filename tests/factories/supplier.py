@@ -1,33 +1,28 @@
-import faker
 from faker.proxy import Faker
-from polyfactory import Ignore, Use
-from polyfactory.factories import DataclassFactory
+from polyfactory import Use
 from polyfactory.factories.pydantic_factory import ModelFactory
 from polyfactory.factories.sqlalchemy_factory import SQLAlchemyFactory
 
-from src.institution.models import InstitutionCreate, InstitutionUpdate
-from src.institution.schemas import Institution
+from src.supplier.models import SupplierCreate, SupplierUpdate
+from src.supplier.schemas import Supplier
 from tests.providers import UkrainePhoneProvider
 
 faker = Faker(locale="uk_UA")
 faker.add_provider(UkrainePhoneProvider)
 
-class InstitutionORMFactory(SQLAlchemyFactory[Institution]):
-    __faker__ = faker
-
-    institution_type = Ignore()
-    equipment = Ignore()
-
-    contact_email = Use(faker.email)
-    contact_phone = Use(faker.ukrainian_phone)
-
-class InstitutionCreateFactory(ModelFactory[InstitutionCreate]):
+class SupplierORMFactory(SQLAlchemyFactory[Supplier]):
     __faker__ = faker
 
     contact_email = Use(faker.email)
     contact_phone = Use(faker.ukrainian_phone)
 
-class InstitutionUpdateFactory(ModelFactory[InstitutionUpdate]):
+class SupplierCreateFactory(ModelFactory[SupplierCreate]):
+    __faker__ = faker
+
+    contact_email = Use(faker.email)
+    contact_phone = Use(faker.ukrainian_phone)
+
+class SupplierUpdateFactory(ModelFactory[SupplierUpdate]):
     __faker__ = faker
 
     contact_email = Use(faker.email)

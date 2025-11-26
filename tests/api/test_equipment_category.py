@@ -19,6 +19,7 @@ async def test_get_equipment_category_list_endpoint(
     await general_test_list_endpoint(
         client=client,
         session=session,
+        model_type=EquipmentCategory,
         orm_factory=equipment_category_orm_factory,
         url="/equipment-categories/",
         page=3,
@@ -37,7 +38,7 @@ async def test_create_equipment_category_endpoint(
         session=session,
         create_factory=equipment_category_create_factory,
         url="/equipment-categories/",
-        model=EquipmentCategory,
+        model_type=EquipmentCategory,
     )
 
 @pytest.mark.asyncio
@@ -53,7 +54,7 @@ async def test_update_equipment_category_endpoint(
         orm_factory=equipment_category_orm_factory,
         update_factory=equipment_category_update_factory,
         url="/equipment-categories/",
-        model=EquipmentCategory,
+        model_type=EquipmentCategory,
     )
 
 

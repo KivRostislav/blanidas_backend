@@ -8,7 +8,7 @@ from src.pagination import PaginationResponse, Pagination
 from src.database import DatabaseSession
 
 
-router = APIRouter(prefix="/institution", tags=["Institution"])
+router = APIRouter(prefix="/institutions", tags=["Institution"])
 services = InstitutionServices()
 
 @router.get("/", response_model=PaginationResponse[InstitutionInfo])
@@ -33,7 +33,7 @@ async def create_institution_endpoint(
         data=model.model_dump(exclude_none=True),
         database=database,
         unique=["name"],
-        foreign_keys=["institution_type_id"],
+        foreign_keys=["institution_type"],
         preload=["institution_type"]
     )
 
@@ -51,13 +51,7 @@ async def update_institution_endpoint(
         preload=["institution_type"]
     )
 
-@router.delete("/", response_model=None)
-async def delete_institution_endpoint(
-        model: InstitutionDelete,
-        database: DatabaseSession,
-) -> None:
-    return await services.delete(
-        id=model.id,
-        database=database
-    )
+@router.delete("/{id}", response_model=None)
+async def delete_institution_endpoint(id: int, database: DatabaseSession) -> None:
+    return await services.delete(id=id, database=database)
 

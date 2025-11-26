@@ -35,7 +35,7 @@ class GenericServices(Generic[ModelType, InfoType]):
         obj = await self.repo.update(id, data, database, unique, foreign_keys, preload)
         return self.return_type.model_validate(obj, from_attributes=True)
 
-    async def delete(self, id: int, database, preload=None) -> None:
+    async def delete(self, id: int, database) -> None:
         await self.repo.delete(id, database)
 
     async def get(self, id: int, database, preload=None) -> InfoType:

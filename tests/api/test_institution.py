@@ -3,71 +3,75 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import pytest
 
-from src.institution_type.schemas import InstitutionType
-from tests.factories.institution_type import InstitutionTypeCreateFactory, InstitutionTypeUpdateFactory, InstitutionTypeORMFactory
+from src.institution.schemas import Institution
+from tests.factories.institution import InstitutionORMFactory, InstitutionCreateFactory, InstitutionUpdateFactory
+from tests.factories.institution_type import InstitutionTypeORMFactory
 from tests.general import general_test_list_endpoint, general_test_create_endpoint, general_test_delete_endpoint, \
     general_test_update_endpoint
 
 
 @pytest.mark.asyncio
-async def test_get_institution_type_list_endpoint(
+async def test_get_institution_list_endpoint(
         client: AsyncClient,
         session: AsyncSession,
+        institution_orm_factory: InstitutionORMFactory,
         institution_type_orm_factory: InstitutionTypeORMFactory,
 ) -> None:
     await general_test_list_endpoint(
         client=client,
         session=session,
-        orm_factory=institution_type_orm_factory,
-        url="/institution-types/",
+        model_type=Institution,
+        preload={"institution_type": institution_type_orm_factory},
+        orm_factory=institution_orm_factory,
+        url="/institutions/",
         page=3,
         limit=8,
         total=20,
     )
 
 @pytest.mark.asyncio
-async def test_create_institution_type_endpoint(
+async def test_create_institution_endpoint(
         client: AsyncClient,
         session: AsyncSession,
-        institution_type_create_factory: InstitutionTypeCreateFactory,
+        institution_create_factory: InstitutionCreateFactory,
+        institution_type_orm_factory: InstitutionTypeORMFactory,
 ) -> None:
     await general_test_create_endpoint(
         client=client,
         session=session,
-        create_factory=institution_type_create_factory,
-        url="/institution-types/",
-        model=InstitutionType,
+        preload={"institution_type": institution_type_orm_factory},
+        create_factory=institution_create_factory,
+        url="/institutions/",
+        model_type=Institution,
     )
 
+
 @pytest.mark.asyncio
-async def test_update_institution_type_endpoint(
+async def test_update_institution_endpoint(
         client: AsyncClient,
         session: AsyncSession,
-        institution_type_orm_factory: InstitutionTypeORMFactory,
-        institution_type_update_factory: InstitutionTypeUpdateFactory,
+        institution_orm_factory: InstitutionORMFactory,
+        institution_update_factory: InstitutionUpdateFactory,
 ) -> None:
     await general_test_update_endpoint(
         client=client,
         session=session,
-        orm_factory=institution_type_orm_factory,
-        update_factory=institution_type_update_factory,
-        url="/institution-types/",
-        model=InstitutionType,
+        orm_factory=institution_orm_factory,
+        update_factory=institution_update_factory,
+        url="/institutions/",
+        model_type=Institution,
     )
 
-
 @pytest.mark.asyncio
-async def test_delete_institution_type_endpoint(
+async def test_delete_institution_endpoint(
         client: AsyncClient,
         session: AsyncSession,
-        institution_type_orm_factory: InstitutionTypeORMFactory,
+        institution_orm_factory: InstitutionORMFactory,
 ) -> None:
     await general_test_delete_endpoint(
         client=client,
         session=session,
-        orm_factory=institution_type_orm_factory,
-        url="/institution-types/{0}",
-        model=InstitutionType,
+        orm_factory=institution_orm_factory,
+        url="/institutions/{0}",
+        model=Institution,
     )
-
-
