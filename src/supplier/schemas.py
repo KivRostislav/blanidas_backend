@@ -13,4 +13,4 @@ class Supplier(BaseDatabaseModel):
     contact_email: Mapped[str] = mapped_column()
     contact_phone: Mapped[str] = mapped_column()
 # gggggggggggggggggggggggggggggggggggggggggggggggggggggg cascade
-    spare_parts: Mapped[list["SparePart"]] = relationship(back_populates="supplier", cascade="all")
+    spare_parts: Mapped[list["SparePart"]] = relationship(back_populates="supplier")

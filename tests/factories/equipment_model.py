@@ -8,6 +8,7 @@ from src.equipment_model.schemas import EquipmentModel
 
 class EquipmentModelORMFactory(SQLAlchemyFactory[EquipmentModel]):
     equipment = Ignore()
+    spare_parts = Ignore()
 
 class EquipmentModelCreateFactory(ModelFactory[EquipmentModelCreate]):
     pass

@@ -8,6 +8,7 @@ from src.manufacturer.models import ManufacturerUpdate, ManufacturerCreate
 
 class ManufacturerORMFactory(SQLAlchemyFactory[Manufacturer]):
     equipment = Ignore()
+    spare_parts = Ignore()
 
 class ManufacturerCreateFactory(ModelFactory[ManufacturerCreate]):
     pass

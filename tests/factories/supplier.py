@@ -1,5 +1,5 @@
 from faker.proxy import Faker
-from polyfactory import Use
+from polyfactory import Use, Ignore
 from polyfactory.factories.pydantic_factory import ModelFactory
 from polyfactory.factories.sqlalchemy_factory import SQLAlchemyFactory
 
@@ -12,6 +12,7 @@ faker.add_provider(UkrainePhoneProvider)
 
 class SupplierORMFactory(SQLAlchemyFactory[Supplier]):
     __faker__ = faker
+    spare_parts = Ignore()
 
     contact_email = Use(faker.email)
     contact_phone = Use(faker.ukrainian_phone)

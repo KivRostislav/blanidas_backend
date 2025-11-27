@@ -21,7 +21,10 @@ async def test_get_institution_list_endpoint(
         client=client,
         session=session,
         model_type=Institution,
-        preload={"institution_type": institution_type_orm_factory},
+        relationships={
+            "institution_type": institution_type_orm_factory.build,
+        },
+        preloads=["institution_type"],
         orm_factory=institution_orm_factory,
         url="/institutions/",
         page=3,
@@ -39,7 +42,8 @@ async def test_create_institution_endpoint(
     await general_test_create_endpoint(
         client=client,
         session=session,
-        preload={"institution_type": institution_type_orm_factory},
+        relationships={"institution_type": institution_type_orm_factory.build},
+        preloads=["institution_type"],
         create_factory=institution_create_factory,
         url="/institutions/",
         model_type=Institution,
@@ -50,6 +54,7 @@ async def test_create_institution_endpoint(
 async def test_update_institution_endpoint(
         client: AsyncClient,
         session: AsyncSession,
+        institution_type_orm_factory: InstitutionTypeORMFactory,
         institution_orm_factory: InstitutionORMFactory,
         institution_update_factory: InstitutionUpdateFactory,
 ) -> None:
@@ -58,6 +63,8 @@ async def test_update_institution_endpoint(
         session=session,
         orm_factory=institution_orm_factory,
         update_factory=institution_update_factory,
+        relationships={"institution_type": institution_type_orm_factory.build},
+        preloads=["institution_type"],
         url="/institutions/",
         model_type=Institution,
     )

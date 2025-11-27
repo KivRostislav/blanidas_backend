@@ -10,3 +10,4 @@ class Manufacturer(BaseDatabaseModel):
     name: Mapped[str] = mapped_column()
 
     equipment: Mapped[list["Equipment"]] = relationship(back_populates="manufacturer")
+    spare_parts: Mapped[list["SparePart"]] = relationship(back_populates="manufacturer")

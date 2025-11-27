@@ -2,7 +2,7 @@ from typing import Type, Any
 
 from sqlalchemy import Sequence, or_, select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 
 
 def build_relation(model_type: Type, preload: Sequence[str]) -> list[Any]:

@@ -9,7 +9,7 @@ class InstitutionInfo(BaseModel):
     id: int
     name: str
     address: str
-    institution_type: InstitutionTypeInfo | None = None
+    institution_type: InstitutionTypeInfo | None
     contact_phone: PhoneNumber
     contact_email: EmailStr
 

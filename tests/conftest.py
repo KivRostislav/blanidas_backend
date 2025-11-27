@@ -11,6 +11,8 @@ from src.main import app
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine, AsyncSession
 
 from src.database import BaseDatabaseModel, get_db_session
+from src.spare_part.schemas import SparePart
+from src.spare_part_category.schemas import SparePartCategory
 from tests.factories.equipment import EquipmentORMFactory, EquipmentUpdateFactory, EquipmentCreateFactory
 from tests.factories.equipment_category import EquipmentCategoryCreateFactory, EquipmentCategoryUpdateFactory, \
     EquipmentCategoryORMFactory
@@ -20,6 +22,9 @@ from tests.factories.equipment_model import EquipmentModelORMFactory, EquipmentM
 from tests.factories.institution_type import InstitutionTypeCreateFactory, InstitutionTypeUpdateFactory, InstitutionTypeORMFactory
 from tests.factories.institution import InstitutionCreateFactory, InstitutionUpdateFactory, InstitutionORMFactory
 from tests.factories.manufacturer import ManufacturerCreateFactory, ManufacturerUpdateFactory, ManufacturerORMFactory
+from tests.factories.spare_part import SparePartORMFactory, SparePartUpdateFactory, SparePartCreateFactory
+from tests.factories.spare_part_category import SparePartCategoryCreateFactory, SparePartCategoryUpdateFactory, \
+    SparePartCategoryORMFactory
 from tests.factories.supplier import SupplierCreateFactory, SupplierUpdateFactory, SupplierORMFactory
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///./test.db"
@@ -51,6 +56,14 @@ register_fixture(EquipmentORMFactory)
 register_fixture(SupplierCreateFactory)
 register_fixture(SupplierUpdateFactory)
 register_fixture(SupplierORMFactory)
+
+register_fixture(SparePartCategoryCreateFactory)
+register_fixture(SparePartCategoryUpdateFactory)
+register_fixture(SparePartCategoryORMFactory)
+
+register_fixture(SparePartCreateFactory)
+register_fixture(SparePartUpdateFactory)
+register_fixture(SparePartORMFactory)
 
 @pytest_asyncio.fixture(scope="session")
 async def engine():

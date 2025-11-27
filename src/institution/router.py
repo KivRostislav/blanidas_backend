@@ -34,7 +34,7 @@ async def create_institution_endpoint(
         database=database,
         unique=["name"],
         foreign_keys=["institution_type"],
-        preload=["institution_type"]
+        preload=["institution_type"],
     )
 
 @router.put("/", response_model=InstitutionInfo)
@@ -47,7 +47,7 @@ async def update_institution_endpoint(
         data=model.model_dump(exclude_none=True),
         database=database,
         unique=["name"],
-        foreign_keys=["institution_type_id"],
+        foreign_keys=["institution_type"],
         preload=["institution_type"]
     )
 
