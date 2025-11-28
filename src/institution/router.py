@@ -1,8 +1,7 @@
 from fastapi import APIRouter
 from fastapi.params import Depends
 
-from src.institution.models import InstitutionInfo, InstitutionFilters, InstitutionCreate, InstitutionUpdate, \
-    InstitutionDelete
+from src.institution.models import InstitutionInfo, InstitutionFilters, InstitutionCreate, InstitutionUpdate
 from src.institution.services import InstitutionServices
 from src.pagination import PaginationResponse, Pagination
 from src.database import DatabaseSession
@@ -21,7 +20,7 @@ async def get_institution_list_endpoint(
         database=database,
         pagination=pagination,
         filters=filters.model_dump(exclude_none=True),
-        preload=["institution_type"]
+        preload=["institution_type"],
     )
 
 @router.post("/", response_model=InstitutionInfo)
@@ -32,9 +31,9 @@ async def create_institution_endpoint(
     return await services.create(
         data=model.model_dump(exclude_none=True),
         database=database,
-        unique=["name"],
-        foreign_keys=["institution_type"],
-        preload=["institution_type"],
+        unique_fields=["name"],
+        relationship_fields=["institution_type"],
+        preloads=["institution_type"],
     )
 
 @router.put("/", response_model=InstitutionInfo)
@@ -46,9 +45,9 @@ async def update_institution_endpoint(
         id=model.id,
         data=model.model_dump(exclude_none=True),
         database=database,
-        unique=["name"],
-        foreign_keys=["institution_type"],
-        preload=["institution_type"]
+        unique_fields=["name"],
+        relationship_fields=["institution_type"],
+        preloads=["institution_type"]
     )
 
 @router.delete("/{id}", response_model=None)

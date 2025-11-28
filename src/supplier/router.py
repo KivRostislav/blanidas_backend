@@ -29,7 +29,7 @@ async def create_supplier_endpoint(
     return await services.create(
         data=model.model_dump(exclude_none=True),
         database=database,
-        unique=["name"]
+        unique_fields=["name"]
     )
 
 @router.put("/", response_model=SupplierInfo)
@@ -41,7 +41,7 @@ async def update_supplier_endpoint(
         id=model.id,
         data=model.model_dump(exclude_none=True),
         database=database,
-        unique=["name"]
+        unique_fields=["name"]
     )
 
 @router.delete("/{id}", response_model=None)

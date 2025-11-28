@@ -14,8 +14,15 @@ from src.auth.utils import generate_jwt_token, TokenType
 from src.database import DatabaseSession
 from src.config import Settings
 from src.models import Pagination
+from src.repository import CRUDRepository
+from src.services import GenericServices
 
 password_hash = PasswordHash.recommended()
+
+class AuthServices(GenericServices[User, UserInfo]):
+    def __init__(self):
+        super().__init__(CRUDRepository(UserInfo), UserInfo)
+
 
 
 async def signin_user(model: UserLogin, settings: Settings, database: DatabaseSession) -> TokenInfo:

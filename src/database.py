@@ -6,11 +6,6 @@ from typing import Annotated
 
 from .config import get_settings
 
-@event.listens_for(mapper, "mapper_configured")
-def set_lazy(mapper, class_):
-    for rel in mapper.relationships:
-        rel.lazy = 'noload'
-
 class BaseDatabaseModel(DeclarativeBase):
     pass
 

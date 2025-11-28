@@ -8,6 +8,7 @@ from tests.factories.equipment import EquipmentORMFactory, EquipmentCreateFactor
 from tests.factories.equipment_category import EquipmentCategoryORMFactory
 from tests.factories.equipment_model import EquipmentModelORMFactory
 from tests.factories.institution import InstitutionORMFactory
+from tests.factories.institution_type import InstitutionTypeORMFactory
 from tests.factories.manufacturer import ManufacturerORMFactory
 from tests.general import general_test_list_endpoint, general_test_create_endpoint, general_test_delete_endpoint, \
     general_test_update_endpoint
@@ -22,13 +23,17 @@ async def test_get_equipment_list_endpoint(
         equipment_model_orm_factory: EquipmentModelORMFactory,
         equipment_category_orm_factory: EquipmentCategoryORMFactory,
         manufacturer_orm_factory: ManufacturerORMFactory,
+        institution_type_orm_factory: InstitutionTypeORMFactory,
 ) -> None:
     await general_test_list_endpoint(
         client=client,
         session=session,
         model_type=Equipment,
         relationships={
-            "institution": institution_orm_factory.build,
+            "institution": {
+                "self": institution_orm_factory.build,
+                "institution_type": institution_type_orm_factory.build,
+            },
             "equipment_model": equipment_model_orm_factory.build,
             "equipment_category": equipment_category_orm_factory.build,
             "manufacturer": manufacturer_orm_factory.build,
@@ -56,22 +61,27 @@ async def test_create_equipment_endpoint(
         equipment_model_orm_factory: EquipmentModelORMFactory,
         equipment_category_orm_factory: EquipmentCategoryORMFactory,
         manufacturer_orm_factory: ManufacturerORMFactory,
+        institution_type_orm_factory: InstitutionTypeORMFactory,
 ) -> None:
     await general_test_create_endpoint(
         client=client,
         session=session,
         model_type=Equipment,
         relationships={
-            "institution": institution_orm_factory.build,
+            "institution": {
+                "self": institution_orm_factory.build,
+                "institution_type": institution_type_orm_factory.build,
+            },
             "equipment_model": equipment_model_orm_factory.build,
             "equipment_category": equipment_category_orm_factory.build,
             "manufacturer": manufacturer_orm_factory.build,
         },
         preloads=[
-            "institution",
             "equipment_model",
             "equipment_category",
             "manufacturer",
+            "institution",
+            "institution.institution_type",
         ],
         url="/equipment/",
         create_factory=equipment_create_factory,

@@ -27,7 +27,7 @@ async def get_equipment_list_endpoint(
             "institution.institution_type",
         ]
     )
-
+# dsfdsfdsdfsfdsdfsdfd
 @router.post("/", response_model=EquipmentInfo)
 async def create_equipment_endpoint(
         model: EquipmentCreate,
@@ -36,19 +36,20 @@ async def create_equipment_endpoint(
     return await services.create(
         data=model.model_dump(exclude_none=True),
         database=database,
-        unique=["name", "serial_number"],
-        foreign_keys=[
+        unique_fields=["name", "serial_number"],
+        relationship_fields=[
             "equipment_model",
             "equipment_category",
             "manufacturer",
             "institution",
             "institution.institution_type",
         ],
-        preload=[
+        preloads=[
             "equipment_model",
             "equipment_category",
             "manufacturer",
             "institution",
+            "institution.institution_type",
         ]
     )
 
@@ -61,19 +62,20 @@ async def update_equipment_endpoint(
         id=model.id,
         data=model.model_dump(exclude_none=True),
         database=database,
-        unique=["name", "serial_number"],
-        foreign_keys=[
+        unique_fields=["name", "serial_number"],
+        relationship_fields=[
             "equipment_model",
             "equipment_category",
             "manufacturer",
             "institution",
             "institution.institution_type",
         ],
-        preload=[
+        preloads=[
             "equipment_model",
             "equipment_category",
             "manufacturer",
             "institution",
+            "institution.institution_type",
         ]
     )
 

@@ -24,30 +24,62 @@ def build_relation(model_type: Type, preload: Sequence[str]) -> list[Any]:
 
     return options
 
-async def validate_foreign_keys(
+async def validate_relationships(
         model_type: Type,
         data: dict,
         database: AsyncSession,
-        foreign_keys: Sequence[str],
+        relationship_fields: list[str],
 ) -> bool:
-    for fk in foreign_keys:
-        parts = fk.split(".")
-        if not hasattr(model_type, parts[0]) or parts[0] + "_id" not in data:
-            continue
+    async def check_relation(model: Type, path: list[str], prefix: str = "") -> bool:
+        field = path[0]
 
-        print(model_type, parts)
-        type_ = getattr(model_type, parts[0]).property.mapper.class_
-        print(type_)
-        if not hasattr(type_, "id"):
-            continue
+        relationship = getattr(model, field).property
+        related_model: Type = relationship.mapper.class_
+        single_fk = prefix + field + "_id"
+        list_fk = prefix + field + "_ids"
+        raw_values = None
 
-        stmt = select(type_).where(type_.id == data[parts[0] + "_id"])
-        result = await database.execute(stmt)
-        obj = result.scalars().first()
+        if relationship.uselist:
+            if list_fk in data:
+                raw_values = data[list_fk]
+            elif prefix + field in data:
+                raw_values = data[prefix + field]
+            else:
+                return True
 
-        if not obj:
+            if not isinstance(raw_values, list):
+                return False
+
+            stmt = select(related_model).where(related_model.id.in_(raw_values))
+            result = await database.execute(stmt)
+            if not result.scalars().all():
+                return False
+
+        else:
+            fk_value = data.get(single_fk)
+            if fk_value is None:
+                return True
+
+            stmt = select(related_model).where(related_model.id == fk_value)
+            result = await database.execute(stmt)
+            obj = result.scalars().first()
+            if not obj:
+                return False
+
+        if len(path) == 1:
+            return True
+
+        new_prefix = prefix + field + "."
+        return await check_relation(related_model, path[1:], new_prefix)
+
+    for relationship_field in relationship_fields:
+        path = relationship_field.split(".")
+        ok = await check_relation(model_type, path)
+        if not ok:
             return False
+
     return True
+
 
 async def validate_unique_fields(
         model_type: Type,

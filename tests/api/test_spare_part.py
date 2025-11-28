@@ -9,6 +9,7 @@ from tests.factories.equipment import EquipmentORMFactory, EquipmentCreateFactor
 from tests.factories.equipment_category import EquipmentCategoryORMFactory
 from tests.factories.equipment_model import EquipmentModelORMFactory
 from tests.factories.institution import InstitutionORMFactory
+from tests.factories.institution_type import InstitutionTypeORMFactory
 from tests.factories.manufacturer import ManufacturerORMFactory
 from tests.factories.spare_part import SparePartORMFactory, SparePartCreateFactory
 from tests.factories.spare_part_category import SparePartCategoryORMFactory
@@ -23,19 +24,22 @@ async def test_get_spare_part_list_endpoint(
         session: AsyncSession,
         spare_part_orm_factory: SparePartORMFactory,
         institution_orm_factory: InstitutionORMFactory,
+        institution_type_orm_factory: InstitutionTypeORMFactory,
         equipment_model_orm_factory: EquipmentModelORMFactory,
         spare_part_category_orm_factory: SparePartCategoryORMFactory,
         manufacturer_orm_factory: ManufacturerORMFactory,
         supplier_orm_factory: SupplierORMFactory,
-
 ) -> None:
     await general_test_list_endpoint(
         client=client,
         session=session,
         model_type=SparePart,
         relationships={
-            "institution": institution_orm_factory.build,
-            "compatible_models": lambda: equipment_model_orm_factory.batch(3),
+            "institution": {
+                "self": institution_orm_factory.build,
+                "institution_type": institution_type_orm_factory.build
+            },
+            "compatible_models": [equipment_model_orm_factory.build] * 3,
             "spare_part_category": spare_part_category_orm_factory.build,
             "manufacturer": manufacturer_orm_factory.build,
             "supplier": supplier_orm_factory.build,
@@ -49,11 +53,12 @@ async def test_get_spare_part_list_endpoint(
     )
 
 @pytest.mark.asyncio
-async def test_create_equipment_endpoint(
+async def test_create_spare_part_endpoint(
         client: AsyncClient,
         session: AsyncSession,
         spare_part_create_factory: SparePartCreateFactory,
         institution_orm_factory: InstitutionORMFactory,
+        institution_type_orm_factory: InstitutionTypeORMFactory,
         equipment_model_orm_factory: EquipmentModelORMFactory,
         spare_part_category_orm_factory: SparePartCategoryORMFactory,
         manufacturer_orm_factory: ManufacturerORMFactory,
@@ -64,8 +69,11 @@ async def test_create_equipment_endpoint(
         session=session,
         model_type=SparePart,
         relationships={
-            "institution": institution_orm_factory.build,
-            "compatible_models": lambda: equipment_model_orm_factory.batch(3),
+            "institution": {
+                "self": institution_orm_factory.build,
+                "institution_type": institution_type_orm_factory.build
+            },
+            "compatible_models": [equipment_model_orm_factory.build] * 3,
             "spare_part_category": spare_part_category_orm_factory.build,
             "manufacturer": manufacturer_orm_factory.build,
             "supplier": supplier_orm_factory.build,

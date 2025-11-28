@@ -56,3 +56,6 @@ class User(BaseDatabaseModel):
     workplace_id: Mapped[Optional[int]] = mapped_column(ForeignKey("institution.id"), nullable=True)
     department: Mapped[str] = mapped_column()
     hire_at: Mapped[date] = mapped_column()
+
+    receive_low_stock_notification: Mapped[bool] = mapped_column()
+    receive_repair_request_creation_notification: Mapped[bool] = mapped_column()

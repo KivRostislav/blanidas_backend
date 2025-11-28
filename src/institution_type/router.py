@@ -30,7 +30,7 @@ async def create_institution_type_endpoint(
     return await services.create(
         data=model.model_dump(exclude_none=True),
         database=database,
-        unique=["name"]
+        unique_fields=["name"]
     )
 
 @router.put("/", response_model=InstitutionTypeInfo)
@@ -42,7 +42,7 @@ async def update_institution_type_endpoint(
         id=model.id,
         data=model.model_dump(exclude_none=True),
         database=database,
-        unique=["name"]
+        unique_fields=["name"]
     )
 
 @router.delete("/{id}", response_model=None)

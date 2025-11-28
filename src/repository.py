@@ -1,12 +1,13 @@
-from typing import Generic, TypeVar, Type, Sequence
+from collections.abc import Callable
+from typing import Generic, TypeVar, Type, Sequence, Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import select, and_, func
+from sqlalchemy import select, and_, func, Select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from src.pagination import Pagination
-from src.utils import build_relation, validate_unique_fields, validate_foreign_keys
+from src.utils import build_relation, validate_unique_fields, validate_relationships
 
 from math import ceil
 
@@ -52,20 +53,26 @@ def apply_filters(stmt, model, filters: dict):
 
     return stmt
 
+FilterCallback = Callable[[Select[Any], Type[ModelType], dict[str, Any]], Select[Any]]
+
+
 class CRUDRepository(Generic[ModelType]):
-    def __init__(self, model: Type[ModelType]):
+    def __init__(self, model: Type[ModelType], filter_callback: FilterCallback = apply_filters):
         self.model = model
+        self.filter_callback = filter_callback
 
     async def paginate(
             self,
             database: AsyncSession,
             pagination: Pagination,
             filters: dict | None = None,
-            preload: Sequence[str] | None = None,
+            preload: list[str] | None = None,
     ) -> dict:
+        preload = preload if preload else []
+        filters = filters if filters else {}
+
         stmt = select(self.model)
-        if filters:
-            stmt = apply_filters(stmt, self.model, filters)
+        stmt = self.filter_callback(stmt, self.model, filters)
 
         if preload:
             options = build_relation(self.model, preload)
@@ -73,7 +80,7 @@ class CRUDRepository(Generic[ModelType]):
 
         count_stmt = select(func.count()).select_from(self.model)
         if filters:
-            count_stmt = apply_filters(stmt, self.model, filters)
+            count_stmt = self.filter_callback(stmt, self.model, filters)
 
         total = (await database.execute(count_stmt)).scalar_one()
         stmt = stmt.offset(pagination.offset).limit(pagination.limit)
@@ -96,28 +103,34 @@ class CRUDRepository(Generic[ModelType]):
             self,
             data: dict,
             database: AsyncSession,
-            unique: Sequence[str] | None = None,
-            foreign_keys: Sequence[str] | None = None,
-            many_to_many: Sequence[str] | None = None,
-            preload: Sequence[str] | None = None,
+            unique_fields: list[str] | None = None,
+            relationship_fields: list[str] | None = None,
+            preloads: list[str] | None = None,
     ) -> ModelType:
-        if unique and not (await validate_unique_fields(self.model, data, database, unique)):
+        unique_fields = unique_fields if unique_fields else []
+        relationship_fields = relationship_fields if relationship_fields else []
+        preloads = preloads if preloads else []
+
+        if not await validate_unique_fields(self.model, data, database, unique_fields):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"{self.model.__name__} with the same fields already exists"
             )
 
-        if foreign_keys and not (await validate_foreign_keys(self.model, data, database, foreign_keys)):
+        if not await validate_relationships(self.model, data, database, relationship_fields):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Some foreign keys does not exist"
             )
-        if not many_to_many:
-            many_to_many = []
 
+        many_to_many = []
         data_copy = data.copy()
-        for x in many_to_many:
-            del data_copy[x + "_ids"]
+        for field in relationship_fields:
+            if field + "_ids" not in data_copy:
+                continue
+
+            del data_copy[field + "_ids"]
+            many_to_many.append(field)
 
         obj = self.model(**data_copy)
         for field in many_to_many:
@@ -125,19 +138,14 @@ class CRUDRepository(Generic[ModelType]):
             rel_model = rel.mapper.class_
 
             ids = data[field + "_ids"]
-
-            result = await database.execute(
-                select(rel_model).where(rel_model.id.in_(ids))
-            )
+            result = await database.execute(select(rel_model).where(rel_model.id.in_(ids)))
             related_objs = result.scalars().all()
             getattr(obj, field).extend(related_objs)
 
         database.add(obj)
         await database.commit()
-        if not preload:
-            return obj
 
-        preload_options = build_relation(self.model, preload)
+        preload_options = build_relation(self.model, preloads)
         stmt = select(self.model).options(*preload_options).where(self.model.id == obj.id)
         result = await database.execute(stmt)
         return result.scalars().first()
@@ -147,19 +155,21 @@ class CRUDRepository(Generic[ModelType]):
         id: int,
         data: dict,
         database: AsyncSession,
-        unique: Sequence[str] | None = None,
-        foreign_keys: Sequence[str] | None = None,
-        many_to_many: Sequence[str] | None = None,
-        preload: Sequence[str] = (),
+        unique_fields: list[str] | None = None,
+        relationship_fields: list[str] | None = None,
+        preloads: list[str] | None = None,
     ) -> ModelType:
-        if unique and not await validate_unique_fields(self.model, data, database, unique, exclude_ids=[id]):
+        unique_fields = unique_fields if unique_fields else []
+        relationship_fields = relationship_fields if relationship_fields else []
+        preloads = preloads if preloads else []
+
+        if not await validate_unique_fields(self.model, data, database, unique_fields, exclude_ids=[id]):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"{self.model.__name__} with id the same fields already exists"
             )
-        if not many_to_many:
-            many_to_many = []
-        options = build_relation(self.model, many_to_many)
+
+        options = build_relation(self.model, relationship_fields)
         stmt = select(self.model).options(*options).where(self.model.id == id)
         result = await database.execute(stmt)
         obj = result.scalars().first()
@@ -170,17 +180,20 @@ class CRUDRepository(Generic[ModelType]):
                 detail=f"{self.model.__name__} with id {id} does not exist"
             )
 
-        if foreign_keys and not (await validate_foreign_keys(self.model, data, database, foreign_keys)):
+        if not await validate_relationships(self.model, data, database, relationship_fields):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Some foreign keys does not exist"
             )
 
         for field, value in data.items():
-            if hasattr(obj, field) and field not in many_to_many:
-                setattr(obj, field, value)
+            if not hasattr(obj, field):
+                continue
 
-        for field in many_to_many:
+            if not isinstance(getattr(obj, field), list):
+                setattr(obj, field, value)
+                continue
+
             rel = self.model.__mapper__.relationships[field]
             rel_model = rel.mapper.class_
 
@@ -195,13 +208,14 @@ class CRUDRepository(Generic[ModelType]):
         database.add(obj)
         await database.commit()
 
-        for field in many_to_many:
-            if field not in preload:
-                setattr(obj, field, [])
-        if not preload:
+        for relationship_filed in relationship_fields:
+            if hasattr(obj, relationship_filed) and isinstance(getattr(obj, relationship_filed), list):
+                setattr(obj, relationship_filed, [])
+
+        if not preloads:
             return obj
 
-        options = build_relation(self.model, preload)
+        options = build_relation(self.model, preloads)
         stmt = select(self.model).options(*options).where(self.model.id == obj.id)
         result = await database.execute(stmt)
         return result.scalars().first()

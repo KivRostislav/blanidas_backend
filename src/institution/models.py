@@ -1,4 +1,4 @@
-from pydantic import EmailStr, BaseModel
+from pydantic import EmailStr, BaseModel, field_validator, ConfigDict
 from pydantic_extra_types.phone_numbers import PhoneNumber
 
 from src.institution_type.models import InstitutionTypeInfo
@@ -9,7 +9,7 @@ class InstitutionInfo(BaseModel):
     id: int
     name: str
     address: str
-    institution_type: InstitutionTypeInfo | None
+    institution_type: InstitutionTypeInfo | None = None
     contact_phone: PhoneNumber
     contact_email: EmailStr
 

@@ -1,6 +1,6 @@
 from datetime import date
 
-from pydantic import BaseModel, field_serializer, field_validator
+from pydantic import BaseModel, field_serializer
 
 from src.equipment_category.models import EquipmentCategoryInfo
 from src.equipment_model.models import EquipmentModelInfo

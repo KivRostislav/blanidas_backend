@@ -40,17 +40,15 @@ async def create_spare_part_endpoint(
     return await services.create(
         data=model.model_dump(exclude_none=True),
         database=database,
-        unique=["name"],
-        foreign_keys=[
+        unique_fields=["name"],
+        relationship_fields=[
             "institution",
             "manufacturer",
             "spare_part_category",
             "supplier",
+            "compatible_models",
         ],
-        many_to_many=[
-            "compatible_models"
-        ],
-        preload=[
+        preloads=[
             "compatible_models",
             "institution",
             "institution.institution_type",
@@ -69,17 +67,15 @@ async def update_spare_part_endpoint(
         id=model.id,
         data=model.model_dump(exclude_none=True),
         database=database,
-        unique=["name"],
-        foreign_keys=[
+        unique_fields=["name"],
+        relationship_fields=[
             "institution",
             "manufacturer",
             "spare_part_category",
             "supplier",
+            "compatible_models",
         ],
-        many_to_many=[
-            "compatible_models"
-        ],
-        preload=[
+        preloads=[
             "compatible_models",
             "supplier",
             "spare_part_category",
