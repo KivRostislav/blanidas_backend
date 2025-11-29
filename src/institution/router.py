@@ -20,7 +20,7 @@ async def get_institution_list_endpoint(
         database=database,
         pagination=pagination,
         filters=filters.model_dump(exclude_none=True),
-        preload=["institution_type"],
+        preloads=["institution_type"],
     )
 
 @router.post("/", response_model=InstitutionInfo)

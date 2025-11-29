@@ -66,21 +66,21 @@ class CRUDRepository(Generic[ModelType]):
             database: AsyncSession,
             pagination: Pagination,
             filters: dict | None = None,
-            preload: list[str] | None = None,
+            preloads: list[str] | None = None,
     ) -> dict:
-        preload = preload if preload else []
+        preloads = preloads if preloads else []
         filters = filters if filters else {}
 
         stmt = select(self.model)
         stmt = self.filter_callback(stmt, self.model, filters)
 
-        if preload:
-            options = build_relation(self.model, preload)
+        if preloads:
+            options = build_relation(self.model, preloads)
             stmt = stmt.options(*options)
 
         count_stmt = select(func.count()).select_from(self.model)
         if filters:
-            count_stmt = self.filter_callback(stmt, self.model, filters)
+            count_stmt = self.filter_callback(count_stmt, self.model, filters)
 
         total = (await database.execute(count_stmt)).scalar_one()
         stmt = stmt.offset(pagination.offset).limit(pagination.limit)
@@ -98,6 +98,24 @@ class CRUDRepository(Generic[ModelType]):
             "has_next": pagination.page < total_pages,
             "has_prev": pagination.page > 1,
         }
+
+    async def get(
+            self,
+            id: int,
+            database: AsyncSession,
+            preloads: list[str] | None = None,
+    ) -> ModelType:
+        preloads = preloads if preloads else []
+
+        stmt = select(self.model).options(*build_relation(self.model, preloads)).where(self.model.id == id)
+        obj = (await database.execute(stmt)).scalars().first()
+        if not obj:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"{self.model.__name__} with id {id} does not exist"
+            )
+
+        return obj
 
     async def create(
             self,
@@ -209,7 +227,7 @@ class CRUDRepository(Generic[ModelType]):
         await database.commit()
 
         for relationship_filed in relationship_fields:
-            if hasattr(obj, relationship_filed) and isinstance(getattr(obj, relationship_filed), list):
+            if isinstance(getattr(obj, relationship_filed), list) and relationship_filed not in preloads:
                 setattr(obj, relationship_filed, [])
 
         if not preloads:

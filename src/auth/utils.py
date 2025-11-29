@@ -4,16 +4,37 @@ from typing import Any
 
 import jwt
 
+from src.auth.schemas import User
+from src.config import JWTSettings
+
+
 class TokenType(str, Enum):
     access = "access-token"
     refresh = "refresh-token"
 
-def generate_jwt_token(token_type: TokenType, expire_minutes: int,
-                       payload: dict[str, Any], secret_key: str, algorithm: str) -> str:
+def generate_payload(model: User) -> dict[str, Any]:
+     return {
+        "sub": model.email,
+        "username": model.username,
+        "role": model.role,
+        "scopes": " ".join([x.name for x in model.scopes]),
+        "id": model.id,
+    }
+
+def generate_jwt_token(
+        token_type: TokenType,
+        payload: dict[str, Any],
+        settings: JWTSettings
+) -> str:
+    expire_in_minutes = (
+        settings.access_token_expire_minutes
+        if token_type == TokenType.access
+        else settings.refresh_token_expire_minutes
+    )
     payload.update({
-        "exp": datetime.now() + timedelta(minutes=expire_minutes),
+        "exp": datetime.now() + timedelta(minutes=expire_in_minutes),
         "token_type": token_type.value,
     })
 
-    return jwt.encode(payload, secret_key, algorithm=algorithm)
+    return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
 

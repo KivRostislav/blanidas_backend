@@ -19,7 +19,7 @@ async def get_equipment_list_endpoint(
         database=database,
         pagination=pagination,
         filters=filters.model_dump(exclude_none=True),
-        preload=[
+        preloads=[
             "equipment_model",
             "equipment_category",
             "manufacturer",

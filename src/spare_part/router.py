@@ -20,7 +20,7 @@ async def get_spare_part_list_endpoint(
         database=database,
         pagination=pagination,
         filters=filters.model_dump(exclude_none=True),
-        preload=[
+        preloads=[
             "supplier",
             "spare_part_category",
             "manufacturer",

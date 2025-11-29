@@ -3,11 +3,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from datetime import date
 
-from .auth.models import ScopesCreate
-from .auth.router import router as auth_router
-from .database import engine, session_factory, BaseDatabaseModel
+from sqlalchemy import and_, select
 
-import src.auth.services as auth_services
+from .auth.models import ScopeCreate
+from .auth.router import router as auth_router
+from .auth.schemas import Scope, Role, EngineerScopes, ManagerScopes
+from .auth.services import AuthServices, ScopeServices
+from .database import engine, session_factory, BaseDatabaseModel
 import src.auth.models as auth_models
 import src.auth.schemas as auth_schemas
 
@@ -27,27 +29,37 @@ async def lifespan(_: FastAPI):
     async with engine.begin() as connection:
         await connection.run_sync(BaseDatabaseModel.metadata.create_all)
     async with session_factory() as session:
-        create_manager_scopes = ScopesCreate(
-            role=auth_schemas.Role.manager, scopes=[x for x in auth_schemas.ManagerScopes]
-        )
-        create_engineer_scopes = ScopesCreate(
-            role=auth_schemas.Role.engineer, scopes=[x for x in auth_schemas.EngineerScopes]
-        )
-        await auth_services.create_scopes_if_not_exist(create_manager_scopes, session)
-        await auth_services.create_scopes_if_not_exist(create_engineer_scopes, session)
+        create_manager_scopes = [ScopeCreate(role=Role.manager, name=x) for x in ManagerScopes]
+        create_engineer_scopes = [ScopeCreate(role=Role.engineer, name=x) for x in EngineerScopes]
+        scope_services = ScopeServices()
+        await scope_services.create_if_not_exist(create_manager_scopes, session)
+        await scope_services.create_if_not_exist(create_engineer_scopes, session)
 
+        stmt = select(Scope).where(and_(
+            Scope.role == auth_schemas.Role.manager,
+            Scope.name.in_(auth_schemas.ManagerScopes),
+        ))
+        scopes = (await session.execute(stmt)).scalars().all()
         superuser = auth_models.UserCreate(
-                username="",
-                phone_number="+3800683456789",
-                department="",
-                workplace_id=None,
-                hire_at=date.today(),
-                email="admin@admin.com",
-                password="admin1234",
-                role=auth_schemas.Role.manager,
-                scopes=[scope for scope in auth_schemas.ManagerScopes]
+            username="",
+            phone_number="+3800683456789",
+            department="",
+            workplace_id=None,
+            hire_at=date.today(),
+            email="admin@admin.com",
+            password="admin1234",
+            role=auth_schemas.Role.manager,
+            scopes_ids=[scope.id for scope in scopes],
+            receive_low_stock_notification=True,
+            receive_repair_request_creation_notification=True
         )
-        await auth_services.create_user_if_not_exist(superuser, session)
+        auth_service = AuthServices()
+        await auth_service.create_if_not_exists(
+            data=superuser.model_dump(exclude_none=True),
+            database=session,
+            unique_fields=["username", "email"],
+            relationship_fields=["scopes"],
+        )
     yield
 
 app = FastAPI(lifespan=lifespan)

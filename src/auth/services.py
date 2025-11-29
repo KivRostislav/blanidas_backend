@@ -1,199 +1,194 @@
-from datetime import datetime
+from collections import namedtuple
+from functools import lru_cache
+from typing import Any, Annotated, NamedTuple
 
 from fastapi import HTTPException, status
+from fastapi.params import Depends
+from jwt import InvalidTokenError
 from pwdlib import PasswordHash
 import jwt
+from pydantic import ValidationError
 
-from sqlalchemy import select, and_
-from sqlalchemy.orm import selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.coercions import RoleImpl
 
-from src.auth.models import UserCreate, UserShortInfo, TokenInfo, ScopesCreate, ScopesRead, UserUpdate, UserDelete, \
-    UserFilters, UserInfo, UserLogin, UsersGet
-from src.auth.schemas import User, Scope, Role, Scopes
-from src.auth.utils import generate_jwt_token, TokenType
-from src.database import DatabaseSession
-from src.config import Settings
-from src.models import Pagination
+from src.auth.models import TokenInfo, UserInfo, UserPaginationResponse, ScopeInfo
+from src.auth.schemas import User, Scope, Scopes, Role
+from src.auth.utils import generate_jwt_token, TokenType, generate_payload
+from src.config import JWTSettings
+from src.pagination import Pagination
 from src.repository import CRUDRepository
 from src.services import GenericServices
 
 password_hash = PasswordHash.recommended()
 
+class IsAllowedReturnType(NamedTuple):
+    is_allowed: bool
+    user: User | None
+
 class AuthServices(GenericServices[User, UserInfo]):
     def __init__(self):
-        super().__init__(CRUDRepository(UserInfo), UserInfo)
+        super().__init__(CRUDRepository(User), UserInfo)
 
+    async def create(
+            self,
+            data: dict,
+            database: AsyncSession,
+            unique_fields: list[str] | None = None,
+            relationship_fields: list[str] | None = None,
+            preloads: list[str] | None = None,
+    ) -> UserInfo:
+        data["password_hash"] = password_hash.hash(data["password"])
+        del data["password"]
 
-
-async def signin_user(model: UserLogin, settings: Settings, database: DatabaseSession) -> TokenInfo:
-    user = (await database.execute(
-        select(User).where(User.email == model.email)
-        .options(selectinload(User.scopes))
-    )).scalars().first()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email or password")
-    if not password_hash.verify(model.password, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email or password")
-    payload = {
-        "sub": user.email,
-        "username": user.username,
-        "role": user.role,
-        "scopes": " ".join([x.name for x in user.scopes]),
-    }
-
-    refresh_token_str = generate_jwt_token(
-        TokenType.refresh,
-        settings.jwt_refresh_token_expire_minutes,
-        payload,
-        settings.jwt_secret_key,
-        settings.jwt_algorithm
-    )
-
-    access_token = generate_jwt_token(
-        TokenType.access,
-        settings.jwt_access_token_expire_minutes,
-        payload,
-        settings.jwt_secret_key,
-        settings.jwt_algorithm
-    )
-    return TokenInfo(access_token=access_token, refresh_token=refresh_token_str)
-
-async def refresh_token(refresh_token_str: str, settings: Settings, database: DatabaseSession) -> TokenInfo:
-    data = jwt.decode(refresh_token_str, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
-    if datetime.fromtimestamp(data["exp"]) < datetime.now():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid refresh token")
-    user = (await database.execute(
-        select(User).where(User.email == data["sub"])
-        .options(selectinload(User.scopes))
-    )).scalars().first()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email or password")
-
-    payload = {
-        "sub": user.email,
-        "username": user.username,
-        "role": user.role,
-        "scope": " ".join([x.name for x in user.scopes]),
-    }
-
-    access_token = generate_jwt_token(
-        TokenType.access,
-        settings.jwt_access_token_expire_minutes,
-        payload,
-        settings.jwt_secret_key,
-        settings.jwt_algorithm
-    )
-    return TokenInfo(access_token=access_token, refresh_token=refresh_token_str)
-
-async def get_users_list(
-        current_user_email: str,
-        filters: UserFilters,
-        pagination: Pagination,
-        database: DatabaseSession
-) -> UsersGet:
-    stmt = select(User).where(User.email != current_user_email).options(selectinload(User.scopes))
-    current_user = (await database.execute(select(User)
-                                           .options(selectinload(User.scopes))
-                                           .where(User.email == current_user_email))
-                    ).scalars().first()
-    for key, value in filters.model_dump(exclude_none=True).items():
-        stmt = stmt.where(getattr(User, key) == value)
-
-    if pagination.order_by:
-        order_attr = getattr(User, pagination.order_by)
-        order_attr = order_attr.desc() if pagination.decs else order_attr
-        stmt = stmt.order_by(order_attr)
-    stmt = stmt.offset(pagination.offset).limit(pagination.limit)
-    users = (await database.execute(stmt.options(selectinload(User.scopes)))).scalars().all()
-    map_ = lambda x: UserInfo.model_validate(
-        {**x.__dict__, "scopes": [Scopes(x.name) for x in x.scopes]},
-        from_attributes=True
-    )
-    return UsersGet.model_validate({
-        "current": map_(current_user),
-        "users": [map_(user) for user in users]
-    })
-
-async def create_user(user_model: UserCreate, database: DatabaseSession) -> UserShortInfo:
-    user = (await database.execute(select(User).where(User.email == user_model.email))).scalars().first()
-    if user:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User already exists")
-    scopes = (await database.execute(select(Scope).where(
-        and_(Scope.role == user_model.role, Scope.name.in_(user_model.scopes))
-    ))).scalars().all()
-
-    if len(scopes) != len(user_model.scopes):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid scopes used")
-    user = User(**user_model.model_dump(exclude={"password", "scopes"}))
-    user.password_hash = password_hash.hash(user_model.password)
-    user.scopes.extend(scopes)
-
-    database.add(user)
-    await database.commit()
-    return UserShortInfo.model_validate(user, from_attributes=True)
-
-async def create_user_if_not_exist(user_model: UserCreate, database: DatabaseSession) -> UserShortInfo | None:
-    try:
-        return await create_user(user_model, database)
-    except HTTPException:
-        return None
-    except BaseException as e:
-        raise e
-
-async def update_user(model: UserUpdate, database: DatabaseSession) -> UserShortInfo:
-    user = (await database.execute(select(User).where(User.id == model.id).options(selectinload(User.scopes)))).scalars().first()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User does not exist")
-    scopes = (await database.execute(select(Scope).where(
-        and_(Scope.role == model.role, Scope.name.in_(model.scopes))
-    ))).scalars().all()
-
-    if len(scopes) != len(model.scopes):
-        raise HTTPException(status_code=400, detail="Invalid scopes used")
-    for key, value in model.model_dump(exclude={"password", "scopes"}).items():
-        setattr(user, key, value)
-    if model.password:
-        user.password_hash = password_hash.hash(model.password)
-    user.scopes = list(scopes)
-
-    database.add(user)
-    await database.commit()
-    return UserShortInfo.model_validate(user, from_attributes=True)
-
-async def delete_user(user_model: UserDelete, database: DatabaseSession) -> UserShortInfo:
-    user = (await database.execute(select(User).where(User.id == user_model.id).options(selectinload(User.scopes)))).scalars().first()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User does not exist")
-
-    await database.delete(user)
-    await database.commit()
-    return UserShortInfo.model_validate(**user.__dict__)
-
-async def get_scopes(role: Role, database: DatabaseSession) -> ScopesRead:
-    result = (await database.execute(select(Scope).where(Scope.role == role))).scalars().all()
-    scopes = [x.name for x in result]
-
-    return ScopesRead.model_validate({"role":role, "scopes":scopes}, from_attributes=True)
-
-async def create_scopes_if_not_exist(create_scopes_model: ScopesCreate, database: DatabaseSession) -> list[int]:
-    scope_names = (await database.execute(
-        select(Scope.name).where(
-            and_(Scope.role == create_scopes_model.role, Scope.name.in_(create_scopes_model.scopes))
+        return await super().create(
+            data=data,
+            database=database,
+            unique_fields=unique_fields,
+            relationship_fields=relationship_fields,
+            preloads=preloads,
         )
-    )).scalars().all()
 
-    missing = {x.name for x in create_scopes_model.scopes} - set(scope_names)
-    if not missing:
-        return []
+    async def create_if_not_exists(
+            self,
+            data: dict,
+            database: AsyncSession,
+            unique_fields: list[str] | None = None,
+            relationship_fields: list[str] | None = None,
+            preloads: list[str] | None = None,
+    ) -> UserInfo | None:
+        try:
+            return await self.create(
+                data=data,
+                database=database,
+                unique_fields=unique_fields,
+                relationship_fields=relationship_fields,
+                preloads=preloads,
+            )
+        except HTTPException:
+            return None
 
-    create_scopes_model.scopes = [Scopes(name) for name in missing]
-    return await create_scopes(create_scopes_model, database)
+    async def update(
+            self,
+            id: int,
+            data: dict,
+            database: AsyncSession,
+            unique_fields: list[str] | None = None,
+            relationship_fields: list[str] | None = None,
+            preloads: list[str] | None = None,
+    ) -> UserInfo:
+        if "password" in data:
+            data["password_hash"] = password_hash.hash(data["password"])
+            del data["password"]
+
+        return await super().update(
+            id=id,
+            data=data,
+            database=database,
+            unique_fields=unique_fields,
+            relationship_fields=relationship_fields,
+            preloads=preloads,
+        )
+
+    async def list_with_current(
+            self,
+            current_user_id: int,
+            database: AsyncSession,
+            pagination: Pagination,
+            filters: dict[str, Any] | Any = None,
+            preloads: list[str] | None = None,
+    ) -> UserPaginationResponse:
+        result = await self.repo.paginate(
+            database=database,
+            pagination=pagination,
+            filters=filters,
+            preloads=preloads,
+        )
+        result["items"] = [self.return_type.model_validate(x, from_attributes=True) for x in result["items"]]
+        result["current"] = await self.get(
+            id=current_user_id,
+            database=database,
+            preloads=["scopes", "workplace"],
+        )
+        return UserPaginationResponse.model_validate(result)
+
+    async def get_token(self, data: dict[str, Any], jwt_settings: JWTSettings, database: AsyncSession) -> TokenInfo:
+        try:
+            user = (await self.repo.paginate(
+                pagination=Pagination(page=1, limit=1),
+                filters={"email": data["email"]},
+                database=database,
+                preloads=["scopes"]
+            ))["items"][0]
+        except HTTPException:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email or password")
+
+        if not password_hash.verify(data["password"], user.password_hash):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email or password")
+        payload = generate_payload(user)
+
+        refresh_token_str = generate_jwt_token(token_type=TokenType.refresh, payload=payload, settings=jwt_settings)
+        access_token = generate_jwt_token(token_type=TokenType.access, payload=payload, settings=jwt_settings)
+        return TokenInfo(access_token=access_token, refresh_token=refresh_token_str)
+
+    async def refresh_token(self, data: dict[str, Any], jwt_settings: JWTSettings, database: AsyncSession) -> TokenInfo:
+        try:
+            token_data = jwt.decode(data["refresh_token"], jwt_settings.secret_key, algorithms=[jwt_settings.algorithm])
+        except jwt.ExpiredSignatureError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid refresh token")
+
+        try:
+            user = await self.repo.get(id=token_data["id"], database=database, preloads=["scopes"])
+        except HTTPException:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email or password")
+
+        payload = generate_payload(user)
+        access_token = generate_jwt_token(token_type=TokenType.access, payload=payload, settings=jwt_settings)
+        return TokenInfo(access_token=access_token, refresh_token=data["refresh_token"])
+
+    async def is_allowed(
+            self,
+            data: dict[str, Any],
+            database: AsyncSession,
+            jwt_settings: JWTSettings,
+            scopes: list[Scopes] | None = None,
+            role: Role | None = None,
+    ) -> IsAllowedReturnType:
+        try:
+            payload = jwt.decode(data["access_token"], jwt_settings.secret_key, algorithms=[jwt_settings.algorithm])
+        except (InvalidTokenError, ValidationError):
+            return IsAllowedReturnType(is_allowed=False, user=None)
+
+        id_ = payload.get("id")
+        payload_scopes = payload.get("scopes").split(" ")
+        payload_role = payload.get("role")
+        user = await self.repo.get(id=id_, database=database, preloads=["scopes"])
+        if not user:
+            return IsAllowedReturnType(is_allowed=False, user=None)
+        if scopes:
+            for scope in scopes:
+                if scope not in payload_scopes:
+                    return IsAllowedReturnType(is_allowed=False, user=None)
+        if role and payload_role != role:
+            return IsAllowedReturnType(is_allowed=False, user=None)
+        return IsAllowedReturnType(is_allowed=True, user=user)
 
 
-async def create_scopes(create_scopes_model: ScopesCreate, databae: DatabaseSession) -> list[int]:
-    scopes = [Scope(role=create_scopes_model.role, name=x) for x in create_scopes_model.scopes]
+class ScopeServices(GenericServices[Scope, ScopeInfo]):
+    def __init__(self):
+        super().__init__(CRUDRepository(Scope), ScopeInfo)
 
-    databae.add_all(scopes)
-    await databae.commit()
+    async def create_if_not_exist(self, data: list[dict[str, Any]], database: AsyncSession) -> list[ScopeInfo]:
+        result = []
+        for scope_data in data:
+            try:
+                scope = await self.create(
+                    data=scope_data,
+                    database=database,
+                    unique_fields=["name"],
+                )
+                result.append(ScopeInfo.model_validate(scope, from_attributes=True))
+            except HTTPException:
+                continue
 
-    return [x.id for x in scopes]
+        return result

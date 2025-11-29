@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from enum import Enum
 
 from src.database import BaseDatabaseModel
+from src.institution.schemas import Institution
 
 
 def merge_enums(name: str, *enums: type[Enum]):
@@ -53,7 +54,10 @@ class User(BaseDatabaseModel):
     phone_number: Mapped[str] = mapped_column()
     role: Mapped[Role] = mapped_column()
     scopes: Mapped[List[Scope]] = relationship(back_populates="users", secondary="user_scope")
+
     workplace_id: Mapped[Optional[int]] = mapped_column(ForeignKey("institution.id"), nullable=True)
+    workplace: Mapped[Optional["Institution"]] = relationship(back_populates="users", lazy="raise")
+
     department: Mapped[str] = mapped_column()
     hire_at: Mapped[date] = mapped_column()
 
