@@ -1,10 +1,13 @@
 from functools import lru_cache
-from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends
-from pydantic import Field, BaseModel
+from pydantic import Field, BaseModel, DirectoryPath
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class MailTemplate(BaseSettings):
+    subject_file: str
+    content_file: str
 
 class SMTPSettings(BaseSettings):
     server: str
@@ -15,8 +18,9 @@ class SMTPSettings(BaseSettings):
 
     from_address: str
 
-    low_stock_template_file: Path
-    repair_request_creation_template_file: Path
+    templates_dir: DirectoryPath
+    low_stock_template: MailTemplate
+    repair_request_creation_template: MailTemplate
 
 class JWTSettings(BaseModel):
     secret_key: str = Field(min_length=64)
@@ -40,11 +44,13 @@ def get_settings() -> AppSettings:
 
 SettingsDep = Annotated[AppSettings, Depends(get_settings)]
 
+@lru_cache
 def get_jwt_settings(settings: SettingsDep) -> JWTSettings:
     return settings.jwt
 
 JWTSettingsDep = Annotated[JWTSettings, Depends(get_jwt_settings)]
 
+@lru_cache
 def get_smtp_settings(settings: SettingsDep) -> SMTPSettings:
     return settings.smtp
 

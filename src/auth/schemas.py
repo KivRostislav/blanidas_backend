@@ -62,4 +62,4 @@ class User(BaseDatabaseModel):
     hire_at: Mapped[date] = mapped_column()
 
     receive_low_stock_notification: Mapped[bool] = mapped_column()
-    receive_repair_request_creation_notification: Mapped[bool] = mapped_column()
+    receive_repair_request_created_notification: Mapped[bool] = mapped_column()

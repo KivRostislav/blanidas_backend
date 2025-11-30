@@ -31,7 +31,7 @@ class UserInfo(BaseModel):
     hire_at: date
 
     receive_low_stock_notification: bool
-    receive_repair_request_creation_notification: bool
+    receive_repair_request_created_notification: bool
 
 class UserPaginationResponse(PaginationResponse[UserInfo]):
     current: UserInfo
@@ -60,8 +60,6 @@ class UserCreate(BaseModel):
     workplace_id: Optional[int]
     hire_at: date
 
-    receive_low_stock_notification: bool
-    receive_repair_request_creation_notification: bool
 
 class UserUpdate(BaseModel):
     id: int
@@ -74,6 +72,9 @@ class UserUpdate(BaseModel):
     department: str | None = None
     workplace_id: Optional[int] | None = None
     hire_at: date | None = None
+
+    receive_low_stock_notification: bool
+    receive_repair_request_created_notification: bool
 
 class UserDelete(BaseModel):
     id: int
