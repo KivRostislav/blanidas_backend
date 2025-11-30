@@ -1,11 +1,16 @@
 from fastapi import APIRouter
 from fastapi.params import Depends
+from fastapi_cloud_cli.config import Settings
 
 from src.database import DatabaseSession
 from src.pagination import Pagination
 from src.pagination import PaginationResponse
+from src.smtp import send_low_stock_message
 from src.spare_part.models import SparePartInfo, SparePartFilters, SparePartCreate, SparePartUpdate
 from src.spare_part.services import SparePartServices
+
+from src.config import SMTPSettingsDep
+import src.smtp
 
 router = APIRouter(prefix="/spare-parts", tags=["Spare Parts"])
 services = SparePartServices()
@@ -24,8 +29,8 @@ async def get_spare_part_list_endpoint(
             "supplier",
             "spare_part_category",
             "manufacturer",
-            "institution",
-            "institution.institution_type",
+            "locations.institution",
+            "locations.institution.institution_type",
             "compatible_models"
         ]
     )
@@ -34,15 +39,16 @@ async def get_spare_part_list_endpoint(
 async def create_spare_part_endpoint(
         model: SparePartCreate,
         database: DatabaseSession,
+        settings: SMTPSettingsDep,
 ) -> SparePartInfo:
     #filter for  models dsffffffffffffffffffffffffffffffffffffffffffffffffff
 
     return await services.create(
         data=model.model_dump(exclude_none=True),
         database=database,
+        send_low_stock_message_callback=lambda to, payload: send_low_stock_message(to, payload, settings),
         unique_fields=["name"],
         relationship_fields=[
-            "institution",
             "manufacturer",
             "spare_part_category",
             "supplier",
@@ -50,8 +56,9 @@ async def create_spare_part_endpoint(
         ],
         preloads=[
             "compatible_models",
-            "institution",
-            "institution.institution_type",
+            "locations",
+            "locations.institution",
+            "locations.institution.institution_type",
             "manufacturer",
             "spare_part_category",
             "supplier",
@@ -69,7 +76,7 @@ async def update_spare_part_endpoint(
         database=database,
         unique_fields=["name"],
         relationship_fields=[
-            "institution",
+            "locations",
             "manufacturer",
             "spare_part_category",
             "supplier",
@@ -80,8 +87,8 @@ async def update_spare_part_endpoint(
             "supplier",
             "spare_part_category",
             "manufacturer",
-            "institution",
-            "institution.institution_type",
+            "locations.institution",
+            "locations.institution.institution_type",
         ]
     )
 

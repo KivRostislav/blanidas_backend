@@ -27,7 +27,7 @@ class GenericServices(Generic[ModelType, InfoType]):
             relationship_fields=relationship_fields,
             preloads=preloads,
         )
-        return self.return_type.model_validate(obj, from_attributes=True)
+        return self.return_type.model_validate(obj.__dict__, from_attributes=True)
 
     async def update(
             self,
@@ -46,18 +46,18 @@ class GenericServices(Generic[ModelType, InfoType]):
             relationship_fields=relationship_fields,
             preloads=preloads,
         )
-        return self.return_type.model_validate(obj, from_attributes=True)
+        return self.return_type.model_validate(obj.__dict__, from_attributes=True)
 
     async def delete(self, id: int, database) -> None:
         await self.repo.delete(id, database)
 
-    async def get(self, id: int, database: AsyncSession, preloads: list[str] | None = None) -> InfoType:
-        obj = await self.repo.get(
-            id=id,
+    async def get(self, filters: dict[str, Any], database: AsyncSession, preloads: list[str] | None = None) -> InfoType:
+        objs = await self.repo.get(
+            filters=filters,
             database=database,
             preloads=preloads
         )
-        return self.return_type.model_validate(obj, from_attributes=True)
+        return [self.return_type.model_validate(x.__dict__, from_attributes=True) for x in objs]
 
     async def list(
             self,
@@ -72,5 +72,5 @@ class GenericServices(Generic[ModelType, InfoType]):
             filters=filters,
             preloads=preloads
         )
-        result["items"] = [self.return_type.model_validate(x, from_attributes=True) for x in result["items"]]
-        return PaginationResponse.model_validate(result, from_attributes=True)
+        result["items"] = [self.return_type.model_validate(x.__dict__, from_attributes=True) for x in result["items"]]
+        return PaginationResponse.model_validate(result)

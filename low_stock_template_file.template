@@ -1,0 +1,61 @@
+Увага: низький рівень запасів запчастин
+
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Повідомлення про низький рівень запасів</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            background-color: #ffffff;
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #d9534f;
+        }
+        p {
+            line-height: 1.6;
+        }
+        .details {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+        }
+        .details p {
+            margin: 5px 0;
+        }
+        .footer {
+            margin-top: 20px;
+            font-size: 0.9em;
+            color: #777777;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Увага: низький рівень запасів запчастин</h2>
+        <p>Шановний <strong>{receiver_username}</strong>,</p>
+        <p>Система виявила, що кількість запчастини <strong>"{spare_part_name}"</strong> на складі зменшилася до <strong>{spare_part_current_quantity}</strong>, що нижче встановленого мінімального порогу <strong>{spare_part_min_quantity}</strong>.</p>
+        <p>Будь ласка, вжийте необхідних заходів для поповнення запасів або повідомте відповідального менеджера.</p>
+
+        <div class="details">
+            <p><strong>Запчастина:</strong> {spare_part_name}</p>
+            <p><strong>Поточна кількість:</strong> {spare_part_current_quantity}</p>
+            <p><strong>Мінімальний поріг:</strong> {spare_part_min_quantity}</p>
+        </div>
+
+        <p class="footer">Дякуємо за увагу.<br>З повагою, Система управління складом</p>
+    </div>
+</body>
+</html>

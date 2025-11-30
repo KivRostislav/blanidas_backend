@@ -56,7 +56,7 @@ class User(BaseDatabaseModel):
     scopes: Mapped[List[Scope]] = relationship(back_populates="users", secondary="user_scope")
 
     workplace_id: Mapped[Optional[int]] = mapped_column(ForeignKey("institution.id"), nullable=True)
-    workplace: Mapped[Optional["Institution"]] = relationship(back_populates="users", lazy="raise")
+    workplace: Mapped[Optional["Institution"]] = relationship(back_populates="users", lazy="noload")
 
     department: Mapped[str] = mapped_column()
     hire_at: Mapped[date] = mapped_column()

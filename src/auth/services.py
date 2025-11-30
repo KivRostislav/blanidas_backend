@@ -98,18 +98,20 @@ class AuthServices(GenericServices[User, UserInfo]):
             filters: dict[str, Any] | Any = None,
             preloads: list[str] | None = None,
     ) -> UserPaginationResponse:
+        filters.update({"id__ne": current_user_id })
         result = await self.repo.paginate(
             database=database,
             pagination=pagination,
             filters=filters,
             preloads=preloads,
         )
+
         result["items"] = [self.return_type.model_validate(x, from_attributes=True) for x in result["items"]]
-        result["current"] = await self.get(
-            id=current_user_id,
+        result["current"] = (await self.get(
+            filters={"id": current_user_id},
             database=database,
             preloads=["scopes", "workplace"],
-        )
+        ))[0]
         return UserPaginationResponse.model_validate(result)
 
     async def get_token(self, data: dict[str, Any], jwt_settings: JWTSettings, database: AsyncSession) -> TokenInfo:
@@ -162,7 +164,7 @@ class AuthServices(GenericServices[User, UserInfo]):
         id_ = payload.get("id")
         payload_scopes = payload.get("scopes").split(" ")
         payload_role = payload.get("role")
-        user = await self.repo.get(id=id_, database=database, preloads=["scopes"])
+        user = (await self.repo.get(filters={"id": id_}, database=database, preloads=["scopes"]))[0]
         if not user:
             return IsAllowedReturnType(is_allowed=False, user=None)
         if scopes:

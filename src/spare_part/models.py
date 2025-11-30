@@ -7,21 +7,28 @@ from src.manufacturer.models import ManufacturerInfo
 from src.spare_part_category.models import SparePartCategoryInfo
 from src.supplier.models import SupplierInfo
 
+class SparePartLocationQuantityInfo(BaseModel):
+    id: int
+    quantity: int
+    institution: InstitutionInfo | None
+
+class SparePartLocationQuantityCreate(BaseModel):
+    quantity: int
+    institution_id: int
 
 class SparePartInfo(BaseModel):
     id: int
     name: str
     serial_number: str | None
     price: int
-    quantity: int
     min_quantity: int
     compatible_models: list[EquipmentModelInfo]
     note: str | None
 
-    institution: InstitutionInfo
-    supplier: SupplierInfo
-    spare_part_category: SparePartCategoryInfo
-    manufacturer: ManufacturerInfo
+    locations: list[SparePartLocationQuantityInfo]
+    supplier: SupplierInfo | None
+    spare_part_category: SparePartCategoryInfo | None
+    manufacturer: ManufacturerInfo | None
 
 class SparePartState(str, Enum):
     InStock = "in_stock"
@@ -42,12 +49,11 @@ class SparePartCreate(BaseModel):
     name: str
     serial_number: str | None
     price: int
-    quantity: int
     min_quantity: int
     compatible_models_ids: list[int]
     note: str | None
 
-    institution_id: int
+    locations: list[SparePartLocationQuantityCreate]
     supplier_id: int
     spare_part_category_id: int
     manufacturer_id: int
@@ -57,7 +63,6 @@ class SparePartUpdate(BaseModel):
     name: str | None = None
     serial_number: str | None = None
     price: int | None = None
-    quantity: int | None = None
     min_quantity: int | None = None
     compatible_models_ids: list[int] | None = None
     note: str | None = None

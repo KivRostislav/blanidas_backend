@@ -88,6 +88,9 @@ async def validate_unique_fields(
         unique: Sequence[str],
         exclude_ids: list[int] | None = None,
 ) -> bool:
+    if not unique:
+        return True
+
     conditions = []
     for field in unique:
         if field in data and hasattr(model_type, field):

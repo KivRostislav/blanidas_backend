@@ -51,8 +51,11 @@ async def create_user_endpoint(
         data=model.model_dump(exclude_none=True),
         database=database,
         unique_fields=["username", "email"],
-        relationship_fields=["scopes"],
-        preloads=["scopes", "workplace"]
+        relationship_fields=["scopes", "workplace"],
+        preloads=[
+            "scopes",
+            "workplace",
+        ]
     )
 
 @router.put("/", response_model=UserInfo)

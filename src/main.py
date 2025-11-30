@@ -3,12 +3,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from datetime import date
 
+from fastapi_cloud_cli.config import Settings
 from sqlalchemy import and_, select
 
 from .auth.models import ScopeCreate
 from .auth.router import router as auth_router
 from .auth.schemas import Scope, Role, EngineerScopes, ManagerScopes
 from .auth.services import AuthServices, ScopeServices
+from .config import get_settings
 from .database import engine, session_factory, BaseDatabaseModel
 import src.auth.models as auth_models
 import src.auth.schemas as auth_schemas
@@ -24,13 +26,18 @@ from src.equipment.router import router as equipment_router
 from src.spare_part_category.router import router as spare_part_category_router
 from src.spare_part.router import router as spare_part_router
 
+import src.smtp
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    settings = get_settings()
+    src.smtp.initialize_templates(settings.smtp)
+
     async with engine.begin() as connection:
         await connection.run_sync(BaseDatabaseModel.metadata.create_all)
     async with session_factory() as session:
-        create_manager_scopes = [ScopeCreate(role=Role.manager, name=x) for x in ManagerScopes]
-        create_engineer_scopes = [ScopeCreate(role=Role.engineer, name=x) for x in EngineerScopes]
+        create_manager_scopes = [ScopeCreate(role=Role.manager, name=x).model_dump() for x in ManagerScopes]
+        create_engineer_scopes = [ScopeCreate(role=Role.engineer, name=x).model_dump() for x in EngineerScopes]
         scope_services = ScopeServices()
         await scope_services.create_if_not_exist(create_manager_scopes, session)
         await scope_services.create_if_not_exist(create_engineer_scopes, session)

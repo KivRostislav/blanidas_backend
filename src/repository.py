@@ -101,21 +101,24 @@ class CRUDRepository(Generic[ModelType]):
 
     async def get(
             self,
-            id: int,
+            filters: dict[str, Any],
             database: AsyncSession,
             preloads: list[str] | None = None,
-    ) -> ModelType:
+    ) -> list[ModelType]:
         preloads = preloads if preloads else []
 
-        stmt = select(self.model).options(*build_relation(self.model, preloads)).where(self.model.id == id)
-        obj = (await database.execute(stmt)).scalars().first()
-        if not obj:
+        stmt = select(self.model).options(*build_relation(self.model, preloads))
+        if filters:
+            stmt = self.filter_callback(stmt, self.model, filters)
+
+        objs = (await database.execute(stmt)).unique().scalars().all()
+        if not objs:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"{self.model.__name__} with id {id} does not exist"
             )
 
-        return obj
+        return list(objs)
 
     async def create(
             self,
@@ -167,6 +170,72 @@ class CRUDRepository(Generic[ModelType]):
         stmt = select(self.model).options(*preload_options).where(self.model.id == obj.id)
         result = await database.execute(stmt)
         return result.scalars().first()
+
+    async def create_many(
+            self,
+            data_list: list[dict],
+            database: AsyncSession,
+            unique_fields: list[str] | None = None,
+            relationship_fields: list[str] | None = None,
+            preloads: list[str] | None = None,
+    ) -> list[ModelType]:
+        unique_fields = unique_fields or []
+        relationship_fields = relationship_fields or []
+        preloads = preloads or []
+
+        created_objects = []
+        for data in data_list:
+            if not await validate_unique_fields(self.model, data, database, unique_fields):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"{self.model.__name__} with the same fields already exists"
+                )
+
+            if not await validate_relationships(self.model, data, database, relationship_fields):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Some foreign keys do not exist"
+                )
+
+            many_to_many = []
+            data_copy = data.copy()
+
+            for field in relationship_fields:
+                if field + "_ids" in data_copy:
+                    many_to_many.append(field)
+                    del data_copy[field + "_ids"]
+
+            obj = self.model(**data_copy)
+            database.add(obj)
+            created_objects.append((obj, many_to_many, data))
+
+        await database.commit()
+        for obj, many_to_many, original_data in created_objects:
+            for field in many_to_many:
+                rel = self.model.__mapper__.relationships[field]
+                rel_model = rel.mapper.class_
+
+                ids = original_data[field + "_ids"]
+                result = await database.execute(
+                    select(rel_model).where(rel_model.id.in_(ids))
+                )
+                related_objs = result.scalars().all()
+                getattr(obj, field).extend(related_objs)
+
+        await database.commit()
+        preload_options = build_relation(self.model, preloads)
+
+        ids = [obj.id for obj, _, _ in created_objects]
+
+        stmt = (
+            select(self.model)
+            .options(*preload_options)
+            .where(self.model.id.in_(ids))
+        )
+
+        result = await database.execute(stmt)
+        return list(result.scalars().all())
+
 
     async def update(
         self,
@@ -249,5 +318,12 @@ class CRUDRepository(Generic[ModelType]):
                 detail=f"{self.model.__name__} with id {id} does not exist"
             )
 
+        await database.delete(obj)
+        await database.commit()
+
+    async def delete_many(self, ids: list[int], database: AsyncSession) -> None:
+        stmt = select(self.model).where(self.model.id.in_(id))
+        result = await database.execute(stmt)
+        obj = result.scalars().all()
         await database.delete(obj)
         await database.commit()

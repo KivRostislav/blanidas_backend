@@ -1,10 +1,12 @@
 from datetime import date
 from typing import Optional, List
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from pydantic_extra_types.phone_numbers import PhoneNumber
+from sqlalchemy.exc import InvalidRequestError
 
 from src.auth.schemas import Role, Scopes
+from src.institution.models import InstitutionInfo
 from src.pagination import PaginationResponse
 
 
@@ -25,7 +27,7 @@ class UserInfo(BaseModel):
     role: Role
     scopes: list[ScopeInfo]
     department: str
-    workplace: str | None = None
+    workplace: InstitutionInfo | None = None
     hire_at: date
 
     receive_low_stock_notification: bool
