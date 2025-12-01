@@ -3,6 +3,8 @@ from sqlalchemy.orm import Mapped, relationship, mapped_column
 
 from src.database import BaseDatabaseModel
 from src.equipment_model.schemas import EquipmentModel, EquipmentModelSparePart
+from src.repair_request.schemas import RepairRequest, SparePartRepairRequest
+
 
 class SparePartLocationQuantity(BaseDatabaseModel):
     __tablename__ = "spare_part_location_quantity"
@@ -41,5 +43,10 @@ class SparePart(BaseDatabaseModel):
 
     manufacturer_id: Mapped[int | None] = mapped_column(ForeignKey("manufacturer.id"), nullable=True)
     manufacturer: Mapped["Manufacturer"] = relationship(back_populates="spare_parts")
+
+    repair_requests: Mapped[list["RepairRequest"]] = relationship(
+        back_populates="used_spare_parts",
+        secondary="spare_part_repair_request",
+    )
 
 

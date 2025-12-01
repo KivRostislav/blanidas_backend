@@ -31,3 +31,5 @@ class Equipment(BaseDatabaseModel):
     manufacturer_id: Mapped[int | None] = mapped_column(ForeignKey("manufacturer.id"), nullable=True)
     manufacturer: Mapped["Manufacturer"] = relationship(back_populates="equipment", lazy="raise")
 
+    repair_requests: Mapped[list["RepairRequest"]] = relationship(back_populates="equipment", lazy="noload")
+

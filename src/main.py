@@ -25,6 +25,7 @@ from src.supplier.router import router as supplier_router
 from src.equipment.router import router as equipment_router
 from src.spare_part_category.router import router as spare_part_category_router
 from src.spare_part.router import router as spare_part_router
+from src.repair_request.router import router as repair_request_router
 
 
 @asynccontextmanager
@@ -80,6 +81,7 @@ app.include_router(institution_type_router)
 app.include_router(supplier_router)
 app.include_router(spare_part_category_router)
 app.include_router(spare_part_router)
+app.include_router(repair_request_router)
 
 
 
