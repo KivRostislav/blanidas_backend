@@ -69,12 +69,12 @@ class SparePartServices(GenericServices[SparePart, SparePartInfo]):
             preloads=preloads
         )
         to_delete_ids = [x.id for x in spare_part.locations]
-        await self.spare_part_location_quantity_repo.delete_many(to_delete_ids)
+        await self.spare_part_location_quantity_repo.delete_many(ids=to_delete_ids, database=database)
 
         for i in range(len(locations_data)):
             locations_data[i]["spare_part_id"] = spare_part.id
 
-        _ = await self.spare_part_location_quantity_repo.create_many(
+        locations = await self.spare_part_location_quantity_repo.create_many(
             data_list=locations_data,
             database=database,
             preloads=[
@@ -82,7 +82,7 @@ class SparePartServices(GenericServices[SparePart, SparePartInfo]):
                 "institution.institution_type"
             ]
         )
-        spare_part.locations = locations_data
+        spare_part.locations = locations
 
         quantity = 0
         for location in locations_data:
@@ -104,6 +104,6 @@ class SparePartServices(GenericServices[SparePart, SparePartInfo]):
                         spare_part_serial_number=spare_part.serial_number,
                         spare_part_current_quantity=quantity,
                         spare_part_min_quantity=spare_part.min_quantity,
-                    ).model_dump()
+                    )
                 )
         return SparePartInfo.model_validate(spare_part.__dict__, from_attributes=True)

@@ -85,6 +85,7 @@ async def update_spare_part_endpoint(
             "supplier",
             "spare_part_category",
             "manufacturer",
+            "locations",
             "locations.institution",
             "locations.institution.institution_type",
         ]

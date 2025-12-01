@@ -322,8 +322,9 @@ class CRUDRepository(Generic[ModelType]):
         await database.commit()
 
     async def delete_many(self, ids: list[int], database: AsyncSession) -> None:
-        stmt = select(self.model).where(self.model.id.in_(id))
+        stmt = select(self.model).where(self.model.id.in_(ids))
         result = await database.execute(stmt)
-        obj = result.scalars().all()
-        await database.delete(obj)
+        objs = result.scalars().all()
+        for obj in objs:
+            await database.delete(obj)
         await database.commit()

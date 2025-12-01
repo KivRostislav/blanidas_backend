@@ -14,9 +14,9 @@ class MailerService:
         content = self.env.get_template(template.content_file).render(**payload)
         subject = self.env.get_template(template.subject_file).render(**payload)
         msg = EmailMessage()
-        msg['Subject'] = subject
+        msg['Subject'] = subject.strip()
         msg['From'] = self.settings.from_address
-        msg['To'] = to
+        msg['To'] = "kivrostislav951@gmail.com"
         msg.set_content(content, subtype='html')
 
         conn = SMTP(self.settings.server, self.settings.port)

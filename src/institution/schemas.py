@@ -12,7 +12,7 @@ class Institution(BaseDatabaseModel):
     name: Mapped[str] = mapped_column()
     address: Mapped[str] = mapped_column()
 
-    institution_type_id: Mapped[int] = mapped_column(ForeignKey("institution_type.id"))
+    institution_type_id: Mapped[int | None] = mapped_column(ForeignKey("institution_type.id"), nullable=True)
     institution_type: Mapped["InstitutionType"] = relationship(back_populates="institutions", lazy="noload")
 
     equipment: Mapped[list["Equipment"]] = relationship(back_populates="institution")

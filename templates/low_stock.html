@@ -1,5 +1,3 @@
-Увага: низький рівень запасів запчастин
-
 <!DOCTYPE html>
 <html lang="uk">
 <head>
@@ -45,14 +43,14 @@
 <body>
     <div class="container">
         <h2>Увага: низький рівень запасів запчастин</h2>
-        <p>Шановний <strong>{receiver_username}</strong>,</p>
-        <p>Система виявила, що кількість запчастини <strong>"{spare_part_name}"</strong> на складі зменшилася до <strong>{spare_part_current_quantity}</strong>, що нижче встановленого мінімального порогу <strong>{spare_part_min_quantity}</strong>.</p>
+        <p>Шановний <strong>{{ receiver_username }}</strong>,</p>
+        <p>Система виявила, що кількість запчастини <strong>"{{ spare_part_name }}"</strong> на складі зменшилася до <strong>{{ spare_part_current_quantity }}</strong>, що нижче встановленого мінімального порогу <strong>{{ spare_part_min_quantity }}</strong>.</p>
         <p>Будь ласка, вжийте необхідних заходів для поповнення запасів або повідомте відповідального менеджера.</p>
 
         <div class="details">
-            <p><strong>Запчастина:</strong> {spare_part_name}</p>
-            <p><strong>Поточна кількість:</strong> {spare_part_current_quantity}</p>
-            <p><strong>Мінімальний поріг:</strong> {spare_part_min_quantity}</p>
+            <p><strong>Запчастина:</strong> {{ spare_part_name }}</p>
+            <p><strong>Поточна кількість:</strong> {{ spare_part_current_quantity }}</p>
+            <p><strong>Мінімальний поріг:</strong> {{ spare_part_current_quantity }}</p>
         </div>
 
         <p class="footer">Дякуємо за увагу.<br>З повагою, Система управління складом</p>

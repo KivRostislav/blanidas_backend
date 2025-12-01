@@ -60,6 +60,9 @@ class UserCreate(BaseModel):
     workplace_id: Optional[int]
     hire_at: date
 
+    receive_low_stock_notification: bool
+    receive_repair_request_created_notification: bool
+
 
 class UserUpdate(BaseModel):
     id: int

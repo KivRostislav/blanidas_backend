@@ -20,7 +20,6 @@ class SparePartInfo(BaseModel):
     id: int
     name: str
     serial_number: str | None
-    price: int
     min_quantity: int
     compatible_models: list[EquipmentModelInfo]
     note: str | None
@@ -48,7 +47,6 @@ class SparePartFilters(BaseModel):
 class SparePartCreate(BaseModel):
     name: str
     serial_number: str | None
-    price: int
     min_quantity: int
     compatible_models_ids: list[int]
     note: str | None
@@ -62,10 +60,13 @@ class SparePartUpdate(BaseModel):
     id: int
     name: str | None = None
     serial_number: str | None = None
-    price: int | None = None
     min_quantity: int | None = None
     compatible_models_ids: list[int] | None = None
     note: str | None = None
+
+    locations: list[SparePartLocationQuantityCreate] | None = None
+    supplier_id: int
+    spare_part_category_id: int
 
     institution_id: int | None = None
     supplier_id: int | None = None

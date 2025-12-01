@@ -13,6 +13,8 @@ from .database import engine, session_factory, BaseDatabaseModel
 import src.auth.models as auth_models
 import src.auth.schemas as auth_schemas
 
+from src.mailer.subscriber import on_low_stock # need
+
 
 from src.institution.router import router as institution_router
 from src.institution_type.router import router as institution_type_router

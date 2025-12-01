@@ -10,10 +10,10 @@ class SparePartLocationQuantity(BaseDatabaseModel):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     quantity: Mapped[int] = mapped_column()
 
-    institution_id: Mapped[int] = mapped_column(ForeignKey("institution.id"))
+    institution_id: Mapped[int | None] = mapped_column(ForeignKey("institution.id"), nullable=True)
     institution: Mapped["Institution"] = relationship(back_populates="spare_part_locations")
 
-    spare_part_id: Mapped[int] = mapped_column(ForeignKey("spare_part.id"))
+    spare_part_id: Mapped[int | None] = mapped_column(ForeignKey("spare_part.id"), nullable=True)
     spare_part: Mapped["SparePart"] = relationship(back_populates="locations")
 
 
@@ -23,7 +23,6 @@ class SparePart(BaseDatabaseModel):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column()
     serial_number: Mapped[str | None] = mapped_column(nullable=True)
-    price: Mapped[int] = mapped_column()
     min_quantity: Mapped[int] = mapped_column()
     compatible_models: Mapped[list["EquipmentModel"]] = relationship(
         back_populates="spare_parts",
@@ -32,15 +31,15 @@ class SparePart(BaseDatabaseModel):
 
     note: Mapped[str | None] = mapped_column(nullable=True)
 
-    supplier_id: Mapped[int] = mapped_column(ForeignKey("supplier.id"))
+    supplier_id: Mapped[int | None] = mapped_column(ForeignKey("supplier.id"), nullable=True)
     supplier: Mapped["Supplier"] = relationship(back_populates="spare_parts")
 
     locations: Mapped[list["SparePartLocationQuantity"]] = relationship(back_populates="spare_part", lazy="noload")
 
-    spare_part_category_id: Mapped[int] = mapped_column(ForeignKey("spare_part_category.id"))
+    spare_part_category_id: Mapped[int | None] = mapped_column(ForeignKey("spare_part_category.id"), nullable=True)
     spare_part_category: Mapped["SparePartCategory"] = relationship(back_populates="spare_parts")
 
-    manufacturer_id: Mapped[int] = mapped_column(ForeignKey("manufacturer.id"))
+    manufacturer_id: Mapped[int | None] = mapped_column(ForeignKey("manufacturer.id"), nullable=True)
     manufacturer: Mapped["Manufacturer"] = relationship(back_populates="spare_parts")
 
 

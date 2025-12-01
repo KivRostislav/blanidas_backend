@@ -2,8 +2,6 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel
 
-
-@dataclass
 class LowStockMessagePayload(BaseModel):
     receiver_username: str
 
