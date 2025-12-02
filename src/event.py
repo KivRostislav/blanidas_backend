@@ -6,6 +6,7 @@ event_listeners: Dict[str, List[Callable]] = {}
 
 class EventTypes(str, Enum):
     low_stock = "low_stock"
+    repair_request_created = "repair_request_created"
 
 
 def on(event_name: str):

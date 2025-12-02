@@ -1,6 +1,6 @@
 from typing import Generic, TypeVar, Type, Any
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, AsyncSessionTransaction
 
 from src.pagination import PaginationResponse, Pagination
 from src.repository import CRUDRepository
@@ -48,7 +48,7 @@ class GenericServices(Generic[ModelType, InfoType]):
         )
         return self.return_type.model_validate(obj.__dict__, from_attributes=True)
 
-    async def delete(self, id: int, database) -> None:
+    async def delete(self, id: int, database: AsyncSession) -> None:
         await self.repo.delete(id, database)
 
     async def get(self, filters: dict[str, Any], database: AsyncSession, preloads: list[str] | None = None) -> InfoType:

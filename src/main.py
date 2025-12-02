@@ -26,6 +26,7 @@ from src.equipment.router import router as equipment_router
 from src.spare_part_category.router import router as spare_part_category_router
 from src.spare_part.router import router as spare_part_router
 from src.repair_request.router import router as repair_request_router
+from src.failure_type.router import router as failure_type_router
 
 
 @asynccontextmanager
@@ -38,7 +39,7 @@ async def lifespan(_: FastAPI):
         scope_services = ScopeServices()
         await scope_services.create_if_not_exist(create_manager_scopes, session)
         await scope_services.create_if_not_exist(create_engineer_scopes, session)
-
+# healthy check sdfaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaadsafasdfsadfsfsafasdfdsafasd
         stmt = select(Scope).where(and_(
             Scope.role == auth_schemas.Role.manager,
             Scope.name.in_(auth_schemas.ManagerScopes),
@@ -82,8 +83,4 @@ app.include_router(supplier_router)
 app.include_router(spare_part_category_router)
 app.include_router(spare_part_router)
 app.include_router(repair_request_router)
-
-
-
-
-
+app.include_router(failure_type_router)

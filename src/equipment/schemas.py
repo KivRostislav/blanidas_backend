@@ -20,16 +20,16 @@ class Equipment(BaseDatabaseModel):
     installed: Mapped[date] = mapped_column(StringToDate)
 
     institution_id: Mapped[int | None] = mapped_column(ForeignKey("institution.id"), nullable=True)
-    institution: Mapped["Institution"] = relationship(back_populates="equipment", lazy="raise")
+    institution: Mapped["Institution"] = relationship(back_populates="equipment", lazy="noload")
 
     equipment_model_id: Mapped[int | None] = mapped_column(ForeignKey("equipment_model.id"), nullable=True)
-    equipment_model: Mapped["EquipmentModel"] = relationship(back_populates="equipment", lazy="raise")
+    equipment_model: Mapped["EquipmentModel"] = relationship(back_populates="equipment", lazy="noload")
 
     equipment_category_id: Mapped[int | None] = mapped_column(ForeignKey("equipment_category.id"), nullable=True)
-    equipment_category: Mapped["EquipmentCategory"] = relationship(back_populates="equipment", lazy="raise")
+    equipment_category: Mapped["EquipmentCategory"] = relationship(back_populates="equipment", lazy="noload")
 
     manufacturer_id: Mapped[int | None] = mapped_column(ForeignKey("manufacturer.id"), nullable=True)
-    manufacturer: Mapped["Manufacturer"] = relationship(back_populates="equipment", lazy="raise")
+    manufacturer: Mapped["Manufacturer"] = relationship(back_populates="equipment", lazy="noload")
 
     repair_requests: Mapped[list["RepairRequest"]] = relationship(back_populates="equipment", lazy="noload")
 

@@ -1,10 +1,13 @@
 from datetime import datetime
 from enum import Enum
 
+from jinja2.lexer import Failure
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, relationship, mapped_column
 
 from src.database import BaseDatabaseModel
+from src.failure_type.schemas import FailureType, FailureTypeRepairRequest
+
 
 class RepairRequestStatus(str, Enum):
     in_progress = "in_progress"
@@ -39,9 +42,9 @@ class File(BaseDatabaseModel):
     __tablename__ = "file"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    path: Mapped[str] = mapped_column()
+    file_path: Mapped[str] = mapped_column()
 
-    repair_request_id: Mapped[int] = mapped_column(ForeignKey("repair_request.id"), primary_key=True)
+    repair_request_id: Mapped[int] = mapped_column(ForeignKey("repair_request.id"))
     repair_request: Mapped["RepairRequest"] = relationship(back_populates="photos", lazy="noload")
 
 class RepairRequest(BaseDatabaseModel):
@@ -57,6 +60,12 @@ class RepairRequest(BaseDatabaseModel):
     used_spare_parts: Mapped[list["SparePart"]] = relationship(
         back_populates="repair_requests",
         secondary=SparePartRepairRequest.__table__,
+        lazy="noload"
+    )
+
+    failure_types: Mapped[list["FailureType"]] = relationship(
+        back_populates="repair_requests",
+        secondary=FailureTypeRepairRequest.__table__,
         lazy="noload"
     )
 

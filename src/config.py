@@ -32,6 +32,7 @@ class AppSettings(BaseSettings):
     database_url: str
     jwt: JWTSettings
     smtp: SMTPSettings
+    static_files_dir: DirectoryPath
 
     model_config = SettingsConfigDict(
         env_file=".env",

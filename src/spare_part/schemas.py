@@ -29,20 +29,21 @@ class SparePart(BaseDatabaseModel):
     compatible_models: Mapped[list["EquipmentModel"]] = relationship(
         back_populates="spare_parts",
         secondary=EquipmentModelSparePart.__table__,
+        lazy="noload",
     )
 
     note: Mapped[str | None] = mapped_column(nullable=True)
 
     supplier_id: Mapped[int | None] = mapped_column(ForeignKey("supplier.id"), nullable=True)
-    supplier: Mapped["Supplier"] = relationship(back_populates="spare_parts")
+    supplier: Mapped["Supplier"] = relationship(back_populates="spare_parts", lazy="noload")
 
     locations: Mapped[list["SparePartLocationQuantity"]] = relationship(back_populates="spare_part", lazy="noload")
 
     spare_part_category_id: Mapped[int | None] = mapped_column(ForeignKey("spare_part_category.id"), nullable=True)
-    spare_part_category: Mapped["SparePartCategory"] = relationship(back_populates="spare_parts")
+    spare_part_category: Mapped["SparePartCategory"] = relationship(back_populates="spare_parts", lazy="noload")
 
     manufacturer_id: Mapped[int | None] = mapped_column(ForeignKey("manufacturer.id"), nullable=True)
-    manufacturer: Mapped["Manufacturer"] = relationship(back_populates="spare_parts")
+    manufacturer: Mapped["Manufacturer"] = relationship(back_populates="spare_parts", lazy="noload")
 
     repair_requests: Mapped[list["RepairRequest"]] = relationship(
         back_populates="used_spare_parts",
