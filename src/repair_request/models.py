@@ -20,13 +20,14 @@ class RepairRequestFilters(BaseModel):
 
 class RepairRequestStateCreate(BaseModel):
     status: RepairRequestStatus
-    created_at: datetime
     responsible_user_id: int | None
-    repair_request_id: int
 
 class FileCreate(BaseModel):
     file_path: str
     repair_request_id: int
+
+class FileInfo(BaseModel):
+    file_path: str
 
 class RepairRequestInfo(BaseModel):
     id: int
@@ -35,7 +36,7 @@ class RepairRequestInfo(BaseModel):
     manager_note: str
     engineer_note: str
 
-    photos: list[str]
+    photos: list[FileInfo]
     failure_types: list[FailureTypeInfo]
     used_spare_parts: list[SparePartInfo]
     state_history: list[RepairRequestStateInfo]

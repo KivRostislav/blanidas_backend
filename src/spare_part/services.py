@@ -39,6 +39,9 @@ class SparePartServices(GenericServices[SparePart, SparePartInfo]):
         locations = await self.spare_part_location_quantity_repo.create_many(
             data_list=locations_data,
             database=database,
+            relationship_fields=[
+                "institution",
+            ],
             preloads=[
                 "institution",
                 "institution.institution_type"
@@ -58,6 +61,8 @@ class SparePartServices(GenericServices[SparePart, SparePartInfo]):
             relationship_fields: list[str] | None = None,
             preloads: list[str] | None = None,
     ) -> SparePartInfo:
+        if "locations" not in data:
+            data["locations"] = []
         locations_data = data["locations"]
         del data["locations"]
         spare_part = await super().update(
@@ -77,9 +82,12 @@ class SparePartServices(GenericServices[SparePart, SparePartInfo]):
         locations = await self.spare_part_location_quantity_repo.create_many(
             data_list=locations_data,
             database=database,
+            relationship_fields=[
+                "institution",
+            ],
             preloads=[
                 "institution",
-                "institution.institution_type"
+                "institution.institution_type",
             ]
         )
         spare_part.locations = locations

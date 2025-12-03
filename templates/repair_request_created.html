@@ -1,0 +1,24 @@
+<h2>Нова заявка на ремонт обладнання</h2>
+
+<p>Шановний <strong>{{ receiver_username }}</strong>,</p>
+
+<p>Створено нову заявку на ремонт обладнання <strong>"{{ equipment_name }}"</strong>.</p>
+
+<div style="background:#f4f4f4; padding: 10px; border-radius: 6px;">
+    <p><strong>Опис проблеми:</strong> {{ repair_request_description }}</p>
+    <p><strong>Рівень терміновості:</strong> {{ repair_request_urgency_level }}</p>
+</div>
+
+
+{% if repair_request_photos %}
+<div style="margin-top: 15px;">
+    <p><strong>Фото з місця поломки:</strong></p>
+    {% for photo_url in repair_request_photos %}
+        <img src="{{ photo_url }}" alt="Фото поломки" style="max-width:100%; border:1px solid #ccc; border-radius:6px; margin-bottom:10px;">
+    {% endfor %}
+</div>
+{% endif %}
+
+<p>
+    Будь ласка, вжийте необхідних заходів для обробки цієї заявки.
+</p>

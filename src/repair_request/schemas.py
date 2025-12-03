@@ -69,8 +69,16 @@ class RepairRequest(BaseDatabaseModel):
         lazy="noload"
     )
 
-    photos: Mapped[list["File"]] = relationship(back_populates="repair_request", lazy="noload")
-    state_history: Mapped[list["RepairRequestState"]] = relationship(back_populates="repair_request", lazy="noload")
+    photos: Mapped[list["File"]] = relationship(
+        back_populates="repair_request",
+        cascade="all, delete",
+        lazy="noload"
+    )
+    state_history: Mapped[list["RepairRequestState"]] = relationship(
+        back_populates="repair_request",
+        cascade="all, delete",
+        lazy="noload"
+    )
 
     equipment_id: Mapped[int | None] = mapped_column(ForeignKey("equipment.id"), nullable=True)
     equipment: Mapped["Equipment"] = relationship(back_populates="repair_requests", lazy="noload")

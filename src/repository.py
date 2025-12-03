@@ -1,58 +1,17 @@
 from collections.abc import Callable
-from typing import Generic, TypeVar, Type, Sequence, Any
+from typing import Generic, TypeVar, Type, Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import select, and_, func, Select
+from sqlalchemy import select, func, Select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
 
+from src.filter import apply_filters
 from src.pagination import Pagination
 from src.utils import build_relation, validate_unique_fields, validate_relationships
 
 from math import ceil
 
 ModelType = TypeVar("ModelType")
-
-OPERATORS = {
-    "eq": lambda col, val: col == val,
-    "ne": lambda col, val: col != val,
-    "lt": lambda col, val: col < val,
-    "lte": lambda col, val: col <= val,
-    "gt": lambda col, val: col > val,
-    "gte": lambda col, val: col >= val,
-    "like": lambda col, val: col.like(f"%{val}%"),
-    "ilike": lambda col, val: col.ilike(f"%{val}%"),
-    "in": lambda col, val: col.in_(val),
-    "notin": lambda col, val: ~col.in_(val),
-    "isnull": lambda col, val: col.is_(None) if val else col.is_not(None),
-}
-
-
-def apply_filters(stmt, model, filters: dict):
-    conditions = []
-
-    for key, value in filters.items():
-        if value is None:
-            continue
-
-        if "__" in key:
-            field_name, op = key.split("__", 1)
-        else:
-            field_name, op = key, "eq"
-
-        if not hasattr(model, field_name):
-            continue
-
-        col = getattr(model, field_name)
-        operator_func = OPERATORS.get(op)
-        if operator_func:
-            conditions.append(operator_func(col, value))
-
-    if conditions:
-        stmt = stmt.where(and_(*conditions))
-
-    return stmt
-
 FilterCallback = Callable[[Select[Any], Type[ModelType], dict[str, Any]], Select[Any]]
 
 
@@ -274,6 +233,7 @@ class CRUDRepository(Generic[ModelType]):
             )
 
         for field, value in data.items():
+            field = field[:-4] if field.endswith("_ids") else field
             if not hasattr(obj, field):
                 continue
 
@@ -290,7 +250,8 @@ class CRUDRepository(Generic[ModelType]):
                 select(rel_model).where(rel_model.id.in_(ids))
             )
             related_objs = result.scalars().all()
-            setattr(obj, field, related_objs)
+            getattr(obj, field).clear()
+            getattr(obj, field).extend(related_objs)
 
         database.add(obj)
         await database.commit()
