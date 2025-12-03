@@ -9,4 +9,4 @@ class SparePartCategory(BaseDatabaseModel):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column()
 
-    spare_parts: Mapped[list["SparePart"]] = relationship(back_populates="spare_part_category")
+    spare_parts: Mapped[list["SparePart"]] = relationship(back_populates="spare_part_category", lazy="noload")

@@ -1,7 +1,6 @@
 from datetime import datetime
 
 from pydantic import BaseModel
-from starlette.datastructures import UploadFile
 
 from src.auth.models import UserInfo
 from src.equipment.models import EquipmentInfo

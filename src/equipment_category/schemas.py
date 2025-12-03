@@ -9,4 +9,4 @@ class EquipmentCategory(BaseDatabaseModel):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column()
 
-    equipment: Mapped[list["Equipment"]] = relationship(back_populates="equipment_category")
+    equipment: Mapped[list["Equipment"]] = relationship(back_populates="equipment_category", lazy="noload")

@@ -41,7 +41,7 @@ class SparePartFilters(BaseModel):
     institution_type_id: int | None = None
     spare_part_category_id: int | None = None
 
-   # stock_state: SparePartState | None = None
+    stock_state: SparePartState | None = None
 
 
 class SparePartCreate(BaseModel):

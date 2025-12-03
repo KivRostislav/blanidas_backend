@@ -1,7 +1,5 @@
 from sqlalchemy.orm import Mapped, relationship, mapped_column
-
 from src.database import BaseDatabaseModel
-from src.spare_part.schemas import SparePart
 
 
 class Supplier(BaseDatabaseModel):
@@ -12,5 +10,5 @@ class Supplier(BaseDatabaseModel):
 
     contact_email: Mapped[str] = mapped_column()
     contact_phone: Mapped[str] = mapped_column()
-# gggggggggggggggggggggggggggggggggggggggggggggggggggggg cascade
-    spare_parts: Mapped[list["SparePart"]] = relationship(back_populates="supplier")
+
+    spare_parts: Mapped[list["SparePart"]] = relationship(back_populates="supplier", lazy="noload")

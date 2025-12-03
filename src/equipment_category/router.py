@@ -1,8 +1,7 @@
 from fastapi import APIRouter
 from fastapi.params import Depends
 
-from src.equipment_category.models import EquipmentCategoryInfo, EquipmentCategoryFilters, EquipmentCategoryCreate, \
-    EquipmentCategoryUpdate, EquipmentCategoryDelete
+from src.equipment_category.models import EquipmentCategoryInfo, EquipmentCategoryFilters, EquipmentCategoryCreate, EquipmentCategoryUpdate
 from src.equipment_category.services import EquipmentCategoryServices
 from src.pagination import PaginationResponse, Pagination
 from src.database import DatabaseSession
@@ -46,6 +45,6 @@ async def update_equipment_category_endpoint(
         unique_fields=["name"]
     )
 
-@router.delete("/{id}", response_model=None)
-async def delete_equipment_category_endpoint(id: int, database: DatabaseSession) -> None:
-    return await services.delete(id=id, database=database)
+@router.delete("/{id_}", response_model=None)
+async def delete_equipment_category_endpoint(id_: int, database: DatabaseSession) -> None:
+    return await services.delete(id=id_, database=database)

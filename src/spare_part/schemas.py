@@ -2,8 +2,6 @@ from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, relationship, mapped_column
 
 from src.database import BaseDatabaseModel
-from src.equipment_model.schemas import EquipmentModel, EquipmentModelSparePart
-from src.repair_request.schemas import RepairRequest, SparePartRepairRequest
 
 
 class SparePartLocationQuantity(BaseDatabaseModel):
@@ -28,7 +26,7 @@ class SparePart(BaseDatabaseModel):
     min_quantity: Mapped[int] = mapped_column()
     compatible_models: Mapped[list["EquipmentModel"]] = relationship(
         back_populates="spare_parts",
-        secondary=EquipmentModelSparePart.__table__,
+        secondary="equipment_model_spare_part",
         lazy="noload",
     )
 
@@ -52,6 +50,7 @@ class SparePart(BaseDatabaseModel):
     repair_requests: Mapped[list["RepairRequest"]] = relationship(
         back_populates="used_spare_parts",
         secondary="spare_part_repair_request",
+        lazy="noload",
     )
 
 

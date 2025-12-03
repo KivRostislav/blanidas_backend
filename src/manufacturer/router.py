@@ -3,9 +3,7 @@ from fastapi.params import Depends
 
 from src.database import DatabaseSession
 from src.pagination import Pagination
-from src.manufacturer.models import ManufacturerInfo, ManufacturerFilters, ManufacturerCreate, ManufacturerUpdate, \
-    ManufacturerDelete
-
+from src.manufacturer.models import ManufacturerInfo, ManufacturerFilters, ManufacturerCreate, ManufacturerUpdate
 from src.manufacturer.services import ManufacturerServices
 from src.pagination import PaginationResponse
 
@@ -47,6 +45,6 @@ async def update_manufacturer_endpoint(
         unique_fields=["name"]
     )
 
-@router.delete("/{id}", response_model=None)
-async def delete_manufacturer_endpoint(id: int, database: DatabaseSession) -> None:
-    return await services.delete(id=id, database=database)
+@router.delete("/{id_}", response_model=None)
+async def delete_manufacturer_endpoint(id_: int, database: DatabaseSession) -> None:
+    return await services.delete(id=id_, database=database)

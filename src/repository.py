@@ -37,11 +37,11 @@ class CRUDRepository(Generic[ModelType]):
             options = build_relation(self.model, preloads)
             stmt = stmt.options(*options)
 
-        count_stmt = select(func.count()).select_from(self.model)
+        count_stmt = select(func.count(self.model.id)).select_from(self.model)
         if filters:
             count_stmt = self.filter_callback(count_stmt, self.model, filters)
 
-        total = (await database.execute(count_stmt)).scalar_one()
+        total = (await database.execute(count_stmt)).scalar() or 0
         stmt = stmt.offset(pagination.offset).limit(pagination.limit)
 
         result = await database.execute(stmt)
@@ -104,15 +104,43 @@ class CRUDRepository(Generic[ModelType]):
             )
 
         many_to_many = []
+        nested_objects = {}
         data_copy = data.copy()
         for field in relationship_fields:
-            if field + "_ids" not in data_copy:
-                continue
+            if field in data and (
+                    isinstance(data[field], list) and isinstance(data[field][0], dict)
+                    or isinstance(data[field], dict)
+            ):
+                rel = self.model.__mapper__.relationships[field]
+                rel_model = rel.mapper.class_
 
-            del data_copy[field + "_ids"]
-            many_to_many.append(field)
+                created_children = []
+                data_list = data[field]
+                if not isinstance(data[field], list):
+                    data_list = [data[field]]
+
+                for child_data in data_list:
+                    child_obj = rel_model(**child_data)
+                    child_relationship_fields = [rel.key for rel in rel_model.__mapper__.relationships]
+                    if not await validate_relationships(rel_model, child_data, database, child_relationship_fields):
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Some foreign keys does not exist"
+                        )
+                    database.add(child_obj)
+                    created_children.append(child_obj)
+
+                nested_objects[field] = created_children
+                del data_copy[field]
+
+            if field + "_ids" in data_copy:
+                del data_copy[field + "_ids"]
+                many_to_many.append(field)
 
         obj = self.model(**data_copy)
+        for field, nested_object in nested_objects.items():
+            setattr(obj, field, nested_object)
+
         for field in many_to_many:
             rel = self.model.__mapper__.relationships[field]
             rel_model = rel.mapper.class_
@@ -232,26 +260,61 @@ class CRUDRepository(Generic[ModelType]):
                 detail="Some foreign keys does not exist"
             )
 
-        for field, value in data.items():
-            field = field[:-4] if field.endswith("_ids") else field
-            if not hasattr(obj, field):
+        for field, raw_value in data.items():
+            if field.endswith("_ids"):
+                rel_field = field[:-4]
+                if rel_field not in self.model.__mapper__.relationships:
+                    continue
+
+                rel = self.model.__mapper__.relationships[rel_field]
+                rel_model = rel.mapper.class_
+
+                ids = data[field]
+                if not isinstance(ids, list):
+                    ids = [ids]
+
+                result = await database.execute(
+                    select(rel_model).where(rel_model.id.in_(ids))
+                )
+                related_objs = result.scalars().all()
+
+                rel_list = getattr(obj, field)
+                rel_list.clear()
+                await database.flush()
+                rel_list.extend(related_objs)
+
                 continue
 
-            if not isinstance(getattr(obj, field), list):
-                setattr(obj, field, value)
+            # Якщо поле є relationship і містить список dict → створюємо дочірні об'єкти
+            if field in self.model.__mapper__.relationships and (
+                    isinstance(raw_value, dict)
+                    or (isinstance(raw_value, list) and raw_value and isinstance(raw_value[0], dict))
+            ):
+                rel = self.model.__mapper__.relationships[field]
+                rel_model = rel.mapper.class_
+
+                data_list = raw_value if isinstance(raw_value, list) else [raw_value]
+
+                children = []
+                for child_data in data_list:
+                    child_obj = rel_model(**child_data)
+                    child_relationship_fields = [rel.key for rel in rel_model.__mapper__.relationships]
+                    if not await validate_relationships(rel_model, child_data, database, child_relationship_fields):
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Some foreign keys does not exist"
+                        )
+                    children.append(child_obj)
+
+                rel_list = getattr(obj, field)
+                rel_list.clear()
+                await database.flush()
+                rel_list.extend(children)
                 continue
 
-            rel = self.model.__mapper__.relationships[field]
-            rel_model = rel.mapper.class_
-
-            ids = data[field + "_ids"]
-
-            result = await database.execute(
-                select(rel_model).where(rel_model.id.in_(ids))
-            )
-            related_objs = result.scalars().all()
-            getattr(obj, field).clear()
-            getattr(obj, field).extend(related_objs)
+            # Інакше — просте поле
+            if hasattr(obj, field):
+                setattr(obj, field, raw_value)
 
         database.add(obj)
         await database.commit()

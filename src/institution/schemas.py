@@ -15,9 +15,9 @@ class Institution(BaseDatabaseModel):
     institution_type_id: Mapped[int | None] = mapped_column(ForeignKey("institution_type.id"), nullable=True)
     institution_type: Mapped["InstitutionType"] = relationship(back_populates="institutions", lazy="noload")
 
-    equipment: Mapped[list["Equipment"]] = relationship(back_populates="institution")
-    spare_part_locations: Mapped[list["SparePartLocationQuantity"]] = relationship(back_populates="institution")
-    users: Mapped[list["User"]] = relationship(back_populates="workplace")
+    equipment: Mapped[list["Equipment"]] = relationship(back_populates="institution", lazy="noload")
+    spare_part_locations: Mapped[list["SparePartLocationQuantity"]] = relationship(back_populates="institution", lazy="noload")
+    users: Mapped[list["User"]] = relationship(back_populates="workplace", lazy="noload")
 
     contact_email: Mapped[str] = mapped_column()
     contact_phone: Mapped[str] = mapped_column()

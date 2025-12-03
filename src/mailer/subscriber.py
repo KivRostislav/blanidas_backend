@@ -7,14 +7,14 @@ from src.mailer.smtp import MailerService
 def on_low_stock(to: str, mailer: MailerService, payload: LowStockMessagePayload):
     mailer.send_message(
         template=mailer.settings.low_stock_template,
+        payload=payload.model_dump(),
         to=to,
-        payload=payload.model_dump()
     )
 
 @on(EventTypes.repair_request_created.value)
 def on_repair_request_created(to: str, mailer: MailerService, payload: RepairRequestCreatedMessagePayload):
     mailer.send_message(
         template=mailer.settings.repair_request_created_template,
+        payload=payload.model_dump(),
         to=to,
-        payload=payload.model_dump()
     )

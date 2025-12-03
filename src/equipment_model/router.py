@@ -2,8 +2,7 @@ from fastapi import APIRouter
 from fastapi.params import Depends
 
 from src.database import DatabaseSession
-from src.equipment_model.models import EquipmentModelInfo, EquipmentModelFilters, EquipmentModelCreate, \
-    EquipmentModelUpdate, EquipmentModelDelete
+from src.equipment_model.models import EquipmentModelInfo, EquipmentModelFilters, EquipmentModelCreate, EquipmentModelUpdate
 from src.equipment_model.services import EquipmentModelServices
 from src.pagination import PaginationResponse, Pagination
 

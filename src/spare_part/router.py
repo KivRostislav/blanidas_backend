@@ -5,11 +5,12 @@ from src.database import DatabaseSession
 from src.pagination import Pagination
 from src.pagination import PaginationResponse
 from src.mailer.dependencies import MailerServiceDep
+from src.spare_part.filters import spare_part_filter
 from src.spare_part.models import SparePartInfo, SparePartFilters, SparePartCreate, SparePartUpdate
 from src.spare_part.services import SparePartServices
 
 router = APIRouter(prefix="/spare-parts", tags=["Spare Parts"])
-services = SparePartServices()
+services = SparePartServices(filter_callback=spare_part_filter)
 
 @router.get("/", response_model=PaginationResponse[SparePartInfo])
 async def get_spare_part_list_endpoint(
@@ -25,6 +26,7 @@ async def get_spare_part_list_endpoint(
             "supplier",
             "spare_part_category",
             "manufacturer",
+            "locations",
             "locations.institution",
             "locations.institution.institution_type",
             "compatible_models"
@@ -47,6 +49,7 @@ async def create_spare_part_endpoint(
             "spare_part_category",
             "supplier",
             "compatible_models",
+            "locations"
         ],
         preloads=[
             "compatible_models",
@@ -91,6 +94,6 @@ async def update_spare_part_endpoint(
         ]
     )
 
-@router.delete("/{id}", response_model=None)
-async def delete_spare_part_endpoint(id: int, database: DatabaseSession) -> None:
-    return await services.delete(id=id, database=database)
+@router.delete("/{id_}", response_model=None)
+async def delete_spare_part_endpoint(id_: int, database: DatabaseSession) -> None:
+    return await services.delete(id=id_, database=database)

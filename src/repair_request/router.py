@@ -1,6 +1,5 @@
 from fastapi import APIRouter, UploadFile, BackgroundTasks
 from fastapi.params import Depends, Form, File
-from sqlalchemy.sql.annotation import Annotated
 
 from src.mailer.dependencies import MailerServiceDep
 from src.pagination import PaginationResponse, Pagination
@@ -9,7 +8,7 @@ from src.database import DatabaseSession
 from src.repair_request.schemas import UrgencyLevel
 from src.repair_request.services import RepairRequestServices
 
-from src.config import SettingsDep, get_settings
+from src.config import get_settings
 
 router = APIRouter(prefix="/repair-request", tags=["Repair request"])
 

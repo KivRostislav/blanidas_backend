@@ -16,7 +16,7 @@ class MailerService:
         msg = EmailMessage()
         msg['Subject'] = subject.strip()
         msg['From'] = self.settings.from_address
-        msg['To'] = "kivrostislav951@gmail.com"
+        msg['To'] = to
         msg.set_content(content, subtype='html')
 
         conn = SMTP(self.settings.server, self.settings.port)

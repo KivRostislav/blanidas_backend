@@ -45,6 +45,6 @@ async def update_institution_type_endpoint(
         unique_fields=["name"]
     )
 
-@router.delete("/{id}", response_model=None)
-async def delete_institution_type_endpoint(id: int, database: DatabaseSession) -> None:
-    return await services.delete(id=id, database=database)
+@router.delete("/{id_}", response_model=None)
+async def delete_institution_type_endpoint(id_: int, database: DatabaseSession) -> None:
+    return await services.delete(id=id_, database=database)

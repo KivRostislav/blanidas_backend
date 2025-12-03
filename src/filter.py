@@ -1,4 +1,8 @@
+from typing import TypeVar
+
 from sqlalchemy import and_
+
+from src.database import BaseDatabaseModel
 
 OPERATORS = {
     "eq": lambda col, val: col == val,
@@ -14,7 +18,8 @@ OPERATORS = {
     "isnull": lambda col, val: col.is_(None) if val else col.is_not(None),
 }
 
-def apply_filters(stmt, model, filters: dict):
+ModelType = TypeVar("ModelType", bound=BaseDatabaseModel)
+def apply_filters(stmt, model: ModelType, filters: dict):
     conditions = []
 
     for key, value in filters.items():

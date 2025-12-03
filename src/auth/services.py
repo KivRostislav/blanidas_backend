@@ -1,16 +1,12 @@
-from collections import namedtuple
-from functools import lru_cache
-from typing import Any, Annotated, NamedTuple
+from typing import Any, NamedTuple
 
 from fastapi import HTTPException, status
-from fastapi.params import Depends
 from jwt import InvalidTokenError
 from pwdlib import PasswordHash
 import jwt
 from pydantic import ValidationError
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.sql.coercions import RoleImpl
 
 from src.auth.models import TokenInfo, UserInfo, UserPaginationResponse, ScopeInfo
 from src.auth.schemas import User, Scope, Scopes, Role

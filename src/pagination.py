@@ -1,5 +1,4 @@
-from typing import TypeVar, Generic, Sequence
-
+from typing import TypeVar, Generic
 from pydantic import BaseModel
 
 
@@ -10,7 +9,6 @@ class Pagination(BaseModel):
     @property
     def offset(self) -> int:
         return (self.page - 1) * self.limit
-
 
 ItemModelType = TypeVar("ItemModelType", bound=BaseModel)
 class PaginationResponse(BaseModel, Generic[ItemModelType]):

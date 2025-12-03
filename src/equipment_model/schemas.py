@@ -10,8 +10,12 @@ class EquipmentModel(BaseDatabaseModel):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column()
 
-    equipment: Mapped[list["Equipment"]] = relationship(back_populates="equipment_model")
-    spare_parts: Mapped[list["SparePart"]] = relationship(back_populates="compatible_models", secondary="equipment_model_spare_part")
+    equipment: Mapped[list["Equipment"]] = relationship(back_populates="equipment_model", lazy="noload")
+    spare_parts: Mapped[list["SparePart"]] = relationship(
+        back_populates="compatible_models",
+        secondary="equipment_model_spare_part",
+        lazy="noload"
+    )
 
 class EquipmentModelSparePart(BaseDatabaseModel):
     __tablename__ = "equipment_model_spare_part"

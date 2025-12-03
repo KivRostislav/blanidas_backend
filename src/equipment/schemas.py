@@ -4,10 +4,6 @@ from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, relationship, mapped_column
 
 from src.database import BaseDatabaseModel
-from src.equipment_category.schemas import EquipmentCategory
-from src.equipment_model.schemas import EquipmentModel
-from src.institution.schemas import Institution
-from src.manufacturer.schemas import Manufacturer
 from src.models import StringToDate
 
 

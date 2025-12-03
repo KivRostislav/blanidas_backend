@@ -1,7 +1,6 @@
 from datetime import datetime
 from enum import Enum
 
-from jinja2.lexer import Failure
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, relationship, mapped_column
 

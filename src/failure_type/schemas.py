@@ -10,7 +10,11 @@ class FailureType(BaseDatabaseModel):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column()
 
-    repair_requests: Mapped[list["RepairRequest"]] = relationship(back_populates="failure_types", secondary="failure_type_repair_request")
+    repair_requests: Mapped[list["RepairRequest"]] = relationship(
+        back_populates="failure_types",
+        secondary="failure_type_repair_request",
+        lazy="noload"
+    )
 
 class FailureTypeRepairRequest(BaseDatabaseModel):
     __tablename__ = "failure_type_repair_request"

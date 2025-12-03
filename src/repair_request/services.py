@@ -1,7 +1,6 @@
 import uuid
 import os
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 import magic
@@ -14,18 +13,13 @@ from src.event import emit, EventTypes
 from src.mailer.smtp import MailerService
 from src.mailer.models import RepairRequestCreatedMessagePayload
 from src.pagination import Pagination, PaginationResponse
-from src.repair_request.models import RepairRequestInfo, RepairRequestStateCreate, FileCreate, FileInfo
+from src.repair_request.models import RepairRequestInfo, FileCreate, FileInfo
 from src.repair_request.schemas import RepairRequest, RepairRequestState, RepairRequestStatus, File
 from src.repository import CRUDRepository
 from src.services import GenericServices
 
 ALLOWED_PHOTO_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "bmp", "gif", "tiff", "tif"}
-ALLOWED_PHOTO_MIME = {
-    "image/jpeg",
-    "image/png",
-    "image/webp",
-    "image/gif",
-}
+ALLOWED_PHOTO_MIME = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 
 def form_url_to_file(static_dir: str, filename: str) -> str:
     return os.path.join(static_dir, filename)
@@ -53,8 +47,8 @@ class RepairRequestServices(GenericServices[RepairRequest, RepairRequestInfo]):
             preloads: list[str] | None = None,
     ) -> RepairRequestInfo:
         photos = photos if photos else []
-        new_files = {}
 
+        new_files = {}
         try:
             for photo in photos:
                 ext = photo.filename.split(".")[-1].lower()

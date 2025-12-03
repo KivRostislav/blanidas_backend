@@ -37,7 +37,6 @@ async def validate_relationships(
         related_model: Type = relationship.mapper.class_
         single_fk = prefix + field + "_id"
         list_fk = prefix + field + "_ids"
-        raw_values = None
 
         if relationship.uselist:
             if list_fk in data:
@@ -47,6 +46,10 @@ async def validate_relationships(
             else:
                 return True
 
+            if not raw_values:
+                return True
+            if isinstance(raw_values, dict) or (isinstance(raw_values, list) and isinstance(raw_values[0], dict)):
+                return True
             if not isinstance(raw_values, list):
                 return False
 
@@ -96,8 +99,9 @@ async def validate_unique_fields(
         if field in data and hasattr(model_type, field):
             conditions.append(getattr(model_type, field) == data[field])
     stmt = select(model_type)
-    if conditions:
-        stmt = stmt.where(or_(*conditions))
+    if not conditions:
+        return True
+    stmt = stmt.where(or_(*conditions))
     exclude_conditions = []
     if exclude_ids and hasattr(model_type, "id"):
         for exclude_id in exclude_ids:

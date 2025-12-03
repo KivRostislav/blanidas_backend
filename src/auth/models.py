@@ -1,9 +1,8 @@
 from datetime import date
 from typing import Optional, List
 
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import BaseModel, EmailStr, Field
 from pydantic_extra_types.phone_numbers import PhoneNumber
-from sqlalchemy.exc import InvalidRequestError
 
 from src.auth.schemas import Role, Scopes
 from src.institution.models import InstitutionInfo
