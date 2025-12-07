@@ -27,6 +27,7 @@ class SparePartServices(GenericServices[SparePart, SparePartInfo]):
             mailer: MailerService | None = None,
             unique_fields: list[str] | None = None,
             relationship_fields: list[str] | None = None,
+            overwrite_relationships: list[str] | None = None,
             preloads: list[str] | None = None,
     ) -> SparePartInfo:
         spare_part = await super().update(
@@ -35,6 +36,7 @@ class SparePartServices(GenericServices[SparePart, SparePartInfo]):
             database=database,
             unique_fields=unique_fields,
             relationship_fields=relationship_fields,
+            overwrite_relationships=overwrite_relationships,
             preloads=preloads
         )
 

@@ -21,6 +21,7 @@ class SMTPSettings(BaseModel):
     templates_dir: DirectoryPath
     low_stock_template: MailTemplate
     repair_request_created_template: MailTemplate
+    health_check_template: MailTemplate
 
 class JWTSettings(BaseModel):
     secret_key: str = Field(min_length=64)
@@ -34,6 +35,9 @@ class AppSettings(BaseSettings):
     smtp: SMTPSettings
     static_files_dir: str
     proxy_url_to_static_files_dir: str
+
+    superuser_email: str
+    superuser_password: str
 
     model_config = SettingsConfigDict(
         env_file=".env",

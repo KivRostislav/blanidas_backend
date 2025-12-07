@@ -34,7 +34,7 @@ class RepairRequestState(BaseDatabaseModel):
     responsible_user_id: Mapped[int | None] = mapped_column(ForeignKey("user.id"), nullable=True)
     responsible_user: Mapped["User"] = relationship(back_populates="repair_request_states", lazy="noload")
 
-    repair_request_id: Mapped[int | None] = mapped_column(ForeignKey("repair_request.id"), nullable=True)
+    repair_request_id: Mapped[int] = mapped_column(ForeignKey("repair_request.id", ondelete="CASCADE"))
     repair_request: Mapped["RepairRequest"] = relationship(back_populates="state_history", lazy="noload")
 
 class File(BaseDatabaseModel):
@@ -43,7 +43,7 @@ class File(BaseDatabaseModel):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     file_path: Mapped[str] = mapped_column()
 
-    repair_request_id: Mapped[int] = mapped_column(ForeignKey("repair_request.id"))
+    repair_request_id: Mapped[int] = mapped_column(ForeignKey("repair_request.id", ondelete="CASCADE"))
     repair_request: Mapped["RepairRequest"] = relationship(back_populates="photos", lazy="noload")
 
 class RepairRequest(BaseDatabaseModel):
@@ -53,8 +53,8 @@ class RepairRequest(BaseDatabaseModel):
     description: Mapped[str] = mapped_column()
     urgency_level: Mapped[UrgencyLevel] = mapped_column()
 
-    manager_note: Mapped[str] = mapped_column()
-    engineer_note: Mapped[str] = mapped_column()
+    manager_note: Mapped[str | None] = mapped_column(nullable=True)
+    engineer_note: Mapped[str | None] = mapped_column(nullable=True)
 
     used_spare_parts: Mapped[list["SparePart"]] = relationship(
         back_populates="repair_requests",
@@ -70,12 +70,12 @@ class RepairRequest(BaseDatabaseModel):
 
     photos: Mapped[list["File"]] = relationship(
         back_populates="repair_request",
-        cascade="all, delete",
+        cascade="all, delete-orphan",
         lazy="noload"
     )
     state_history: Mapped[list["RepairRequestState"]] = relationship(
         back_populates="repair_request",
-        cascade="all, delete",
+        cascade="all, delete-orphan",
         lazy="noload"
     )
 

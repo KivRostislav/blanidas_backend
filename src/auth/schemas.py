@@ -1,6 +1,7 @@
 from datetime import date
 from typing import Optional, List
 
+from pip._internal.network import lazy_wheel
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -53,7 +54,11 @@ class User(BaseDatabaseModel):
     email: Mapped[str] = mapped_column(unique=True, index=True)
     phone_number: Mapped[str] = mapped_column()
     role: Mapped[Role] = mapped_column()
-    scopes: Mapped[List[Scope]] = relationship(back_populates="users", secondary="user_scope")
+    scopes: Mapped[List[Scope]] = relationship(
+        back_populates="users",
+        secondary="user_scope",
+        lazy="noload"
+    )
 
     workplace_id: Mapped[Optional[int]] = mapped_column(ForeignKey("institution.id"), nullable=True)
     workplace: Mapped[Optional["Institution"]] = relationship(back_populates="users", lazy="noload")
@@ -65,3 +70,4 @@ class User(BaseDatabaseModel):
     receive_repair_request_created_notification: Mapped[bool] = mapped_column()
 
     repair_request_states: Mapped[list["RepairRequestState"]] = relationship(back_populates="responsible_user", lazy="noload")
+

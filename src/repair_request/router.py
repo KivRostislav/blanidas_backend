@@ -35,6 +35,7 @@ async def get_repair_request_list_endpoint(
             "used_spare_parts",
             "photos",
             "state_history",
+            "state_history.responsible_user",
         ]
     )
 
@@ -45,20 +46,14 @@ async def create_repair_request_endpoint(
         mailer: MailerServiceDep,
         description: str = Form(...),
         urgency_level: UrgencyLevel = Form(...),
-        manager_note: str = Form(...),
-        engineer_note: str = Form(...),
-        failure_types_ids: list[int] = Form(...),
-        used_spare_parts_ids: list[int] = Form(...),
         equipment_id: int = Form(...),
-        photos: list[UploadFile] = File(default=[]),
+        photos: list[UploadFile] | None = File(None),
 ) -> RepairRequestInfo:
+    photos = photos or []
+
     model = RepairRequestCreate(
         description=description,
         urgency_level=urgency_level,
-        manager_note=manager_note,
-        failure_types_ids=failure_types_ids,
-        engineer_note=engineer_note,
-        used_spare_parts_ids=used_spare_parts_ids,
         equipment_id=equipment_id,
     )
 
@@ -70,8 +65,7 @@ async def create_repair_request_endpoint(
         photos=photos,
         relationship_fields=[
             "equipment",
-            "failure_types",
-            "used_spare_parts"
+            "state_history",
         ],
         preloads=[
             "equipment",
@@ -80,6 +74,7 @@ async def create_repair_request_endpoint(
             "used_spare_parts",
             "photos",
             "state_history",
+            "state_history.responsible_user",
         ]
     )
 
@@ -97,19 +92,33 @@ async def update_repair_request_endpoint(
             "failure_types",
             "used_spare_parts",
             "state_history",
-            "state_history.responsible_user",
         ],
+        # dfgdgdfgfdgdf
         preloads=[
-            "equipment",
-            "equipment.institution",
             "failure_types",
             "used_spare_parts",
             "photos",
             "state_history",
+            "state_history.responsible_user",
+            "equipment",
+            "equipment.institution",
         ]
     )
 
-@router.delete("/{id}", response_model=None)
-async def delete_repair_request_endpoint(id: int, database: DatabaseSession) -> None:
-    return await services.delete(id=id, database=database)
+@router.delete("/{id_}", response_model=None)
+async def delete_repair_request_endpoint(
+        id_: int,
+        database: DatabaseSession,
+        background_tasks: BackgroundTasks
+) -> None:
+    return await services.delete(
+        id_=id_,
+        database=database,
+        relationship_fields=[
+            "failure_types",
+            "used_spare_parts",
+            "state_history",
+        ],
+        background_tasks=background_tasks,
+    )
 

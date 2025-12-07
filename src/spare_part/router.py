@@ -38,8 +38,6 @@ async def create_spare_part_endpoint(
         model: SparePartCreate,
         database: DatabaseSession,
 ) -> SparePartInfo:
-    #filter for  models dsffffffffffffffffffffffffffffffffffffffffffffffffff
-
     return await services.create(
         data=model.model_dump(exclude_none=True),
         database=database,
@@ -83,6 +81,7 @@ async def update_spare_part_endpoint(
             "supplier",
             "compatible_models",
         ],
+        overwrite_relationships=["locations"],
         preloads=[
             "compatible_models",
             "supplier",
@@ -96,4 +95,14 @@ async def update_spare_part_endpoint(
 
 @router.delete("/{id_}", response_model=None)
 async def delete_spare_part_endpoint(id_: int, database: DatabaseSession) -> None:
-    return await services.delete(id=id_, database=database)
+    return await services.delete(
+        id_=id_,
+        database=database,
+        relationship_fields=[
+            "locations",
+            "manufacturer",
+            "spare_part_category",
+            "supplier",
+            "compatible_models",
+        ],
+    )

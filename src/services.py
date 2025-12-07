@@ -1,7 +1,8 @@
 from typing import Generic, TypeVar, Type, Any
 
-from sqlalchemy.ext.asyncio import AsyncSession, AsyncSessionTransaction
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.exceptions import NotFoundError
 from src.pagination import PaginationResponse, Pagination
 from src.repository import CRUDRepository
 
@@ -36,6 +37,7 @@ class GenericServices(Generic[ModelType, InfoType]):
             database: AsyncSession,
             unique_fields: list[str] | None = None,
             relationship_fields: list[str] | None = None,
+            overwrite_relationships: list[str] | None = None,
             preloads: list[str] | None = None,
     ) -> InfoType:
         obj = await self.repo.update(
@@ -44,12 +46,22 @@ class GenericServices(Generic[ModelType, InfoType]):
             database=database,
             unique_fields=unique_fields,
             relationship_fields=relationship_fields,
+            overwrite_relationships=overwrite_relationships,
             preloads=preloads,
         )
         return self.return_type.model_validate(obj.__dict__, from_attributes=True)
 
-    async def delete(self, id: int, database: AsyncSession) -> None:
-        await self.repo.delete(id, database)
+    async def delete(
+            self,
+            id_: int,
+            database: AsyncSession,
+            relationship_fields: list[str] | None = None,
+    ) -> None:
+        await self.repo.delete(
+            id_=id_,
+            database=database,
+            relationship_fields=relationship_fields
+        )
 
     async def get(self, filters: dict[str, Any], database: AsyncSession, preloads: list[str] | None = None) -> InfoType:
         objs = await self.repo.get(

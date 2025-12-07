@@ -13,8 +13,8 @@ from src.event import emit, EventTypes
 from src.mailer.smtp import MailerService
 from src.mailer.models import RepairRequestCreatedMessagePayload
 from src.pagination import Pagination, PaginationResponse
-from src.repair_request.models import RepairRequestInfo, FileCreate, FileInfo
-from src.repair_request.schemas import RepairRequest, RepairRequestState, RepairRequestStatus, File
+from src.repair_request.models import RepairRequestInfo, FileCreate, FileInfo, RepairRequestStateCreate
+from src.repair_request.schemas import RepairRequest, RepairRequestState, File, RepairRequestStatus
 from src.repository import CRUDRepository
 from src.services import GenericServices
 
@@ -66,6 +66,11 @@ class RepairRequestServices(GenericServices[RepairRequest, RepairRequestInfo]):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Unsupported file type"
             )
+        data["state_history"] = RepairRequestStateCreate(
+            status=RepairRequestStatus.not_taken,
+            responsible_user_id=None,
+        ).model_dump()
+        data["state_history"].update({"created_at": datetime.now()})
 
         repair_request = await super().create(
             data=data,
@@ -75,18 +80,11 @@ class RepairRequestServices(GenericServices[RepairRequest, RepairRequestInfo]):
             preloads=preloads,
         )
 
-        repair_request_state_date = {
-            "repair_request_id": repair_request.id,
-            "responsible_user_id": None,
-            "created_at": datetime.now(),
-            "status": RepairRequestStatus.not_taken
-        }
-
         repair_photos_create = [
             FileCreate(
-                file_path=x,
-                repair_request_id=repair_request.id)
-            .model_dump() for x in new_files.keys()
+                file_path=new_file,
+                repair_request_id=repair_request.id
+            ).model_dump() for new_file in new_files.keys()
         ]
 
         saved_files = []
@@ -98,25 +96,20 @@ class RepairRequestServices(GenericServices[RepairRequest, RepairRequestInfo]):
                     saved_files.append(path)
         except Exception as e:
             await super().delete(id=repair_request.id, database=database)
-            for path in saved_files:
-                os.remove(path)
+            background_tasks.add_task(lambda: (os.remove(path) for path in saved_files))
             raise e
 
         repair_photos = await self.file_repo.create_many(
             data_list=repair_photos_create,
             database=database,
         )
-
-        repair_request_states = await self.repair_request_state_repo.create(
-            data=repair_request_state_date,
-            database=database,
-            relationship_fields=["responsible_user"],
-            preloads=["responsible_user"],
-        )
-
-        repair_request.state_history.append(repair_request_states)
         repair_request.photos.extend([
-            FileInfo(file_path=form_url_to_file(self.proxy_url_to_static_files_dir, x.file_path)) for x in repair_photos
+            FileInfo(
+                file_path=form_url_to_file(
+                    self.proxy_url_to_static_files_dir,
+                    repair_photo.file_path
+                )
+            ) for repair_photo in repair_photos
         ])
 
         if background_tasks and mailer:
@@ -139,7 +132,7 @@ class RepairRequestServices(GenericServices[RepairRequest, RepairRequestInfo]):
                     )
                 )
 
-        return RepairRequestInfo.model_validate(repair_request, from_attributes=True)
+        return repair_request
 
     async def update(
             self,
@@ -149,46 +142,40 @@ class RepairRequestServices(GenericServices[RepairRequest, RepairRequestInfo]):
             background_tasks: BackgroundTasks | None = None,
             unique_fields: list[str] | None = None,
             relationship_fields: list[str] | None = None,
+            overwrite_relationships: list[str] | None = None,
             preloads: list[str] | None = None,
     ) -> RepairRequestInfo:
+        if "state_history" in data:
+            data["state_history"].update({"created_at": datetime.now()})
         repair_request = await super().update(
             id=id,
             data=data,
             database=database,
             unique_fields=unique_fields,
             relationship_fields=relationship_fields,
+            overwrite_relationships=overwrite_relationships,
             preloads=preloads,
         )
 
-        data["new_state"]["created_at"] = datetime.now()
-        data["new_state"]["repair_request_id"] = id
-        repair_request_states = await self.repair_request_state_repo.create(
-            data=data["new_state"],
-            database=database,
-            relationship_fields=["responsible_user"],
-            preloads=["responsible_user"],
-        )
-
-        repair_request.state_history.append(repair_request_states)
         for photo in repair_request.photos:
             photo.file_path = form_url_to_file(self.proxy_url_to_static_files_dir, photo.file_path)
-        return RepairRequestInfo.model_validate(repair_request, from_attributes=True)
+        return repair_request
 
     async def delete(
             self,
-            id: int,
+            id_: int,
             database: AsyncSession,
+            relationship_fields: list[str] | None = None,
             background_tasks: BackgroundTasks | None = None,
     ) -> None:
-        photos = await self.file_repo.get(filters={"repair_request_id": id}, database=database)
+        photos = await self.file_repo.get(filters={"repair_request_id": id_}, database=database)
         for photo in photos:
             path = form_url_to_file(self.static_files_dir, photo.file_path)
             if background_tasks:
                 background_tasks.add_task(os.remove, path)
                 continue
             os.remove(path)
-
-        await self.repo.delete(id, database)
+        await self.repo.delete(id_=id_, database=database, relationship_fields=relationship_fields)
 
 
     async def list(

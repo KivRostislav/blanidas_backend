@@ -1,32 +1,24 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
 from datetime import date
 
 from sqlalchemy import and_, select
+from starlette.responses import JSONResponse
 
-from .auth.models import ScopeCreate
-from .auth.router import router as auth_router
-from .auth.schemas import Scope, Role, EngineerScopes, ManagerScopes
-from .auth.services import AuthServices, ScopeServices
-from .database import engine, session_factory, BaseDatabaseModel
+from src.auth.models import ScopeCreate
+from src.auth.schemas import Scope, Role, EngineerScopes, ManagerScopes
+from src.auth.services import AuthServices, ScopeServices
+from src.config import get_settings
+from src.database import engine, session_factory, BaseDatabaseModel
 import src.auth.models as auth_models
 import src.auth.schemas as auth_schemas
 
-from src.mailer.subscriber import on_low_stock # need
+from src.mailer.subscriber import on_low_stock, on_repair_request_created # need
 
+from src.router import router
 
-from src.institution.router import router as institution_router
-from src.institution_type.router import router as institution_type_router
-from src.equipment_model.router import router as equipment_model_router
-from src.equipment_category.router import router as equipment_category_router
-from src.manufacturer.router import router as manufacturer_router
-from src.supplier.router import router as supplier_router
-from src.equipment.router import router as equipment_router
-from src.spare_part_category.router import router as spare_part_category_router
-from src.spare_part.router import router as spare_part_router
-from src.repair_request.router import router as repair_request_router
-from src.failure_type.router import router as failure_type_router
+from .exceptions import DomainError, NotFoundError
 
 
 @asynccontextmanager
@@ -45,14 +37,15 @@ async def lifespan(_: FastAPI):
             Scope.name.in_(auth_schemas.ManagerScopes),
         ))
         scopes = (await session.execute(stmt)).scalars().all()
+        settings = get_settings()
         superuser = auth_models.UserCreate(
             username="",
-            phone_number="+3800683456789",
+            phone_number="+380686894116",
             department="",
             workplace_id=None,
             hire_at=date.today(),
-            email="admin@admin.com",
-            password="admin1234",
+            email=settings.superuser_email,
+            password=settings.superuser_password,
             role=auth_schemas.Role.manager,
             scopes_ids=[scope.id for scope in scopes],
             receive_low_stock_notification=True,
@@ -68,19 +61,11 @@ async def lifespan(_: FastAPI):
     yield
 
 app = FastAPI(lifespan=lifespan)
+app.include_router(router)
 
-
-app.include_router(institution_router)
-app.include_router(institution_type_router)
-app.include_router(equipment_model_router)
-app.include_router(equipment_category_router)
-app.include_router(manufacturer_router)
-app.include_router(equipment_router)
-
-app.include_router(auth_router)
-app.include_router(institution_type_router)
-app.include_router(supplier_router)
-app.include_router(spare_part_category_router)
-app.include_router(spare_part_router)
-app.include_router(repair_request_router)
-app.include_router(failure_type_router)
+@app.exception_handler(DomainError)
+async def domain_error_handler(_: Request, exc: DomainError):
+    status_code = status.HTTP_400_BAD_REQUEST
+    if isinstance(exc, NotFoundError):
+        status_code = status.HTTP_404_NOT_FOUND
+    return JSONResponse(status_code=status_code, content={"detail": exc.message})

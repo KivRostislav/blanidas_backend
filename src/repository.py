@@ -5,9 +5,10 @@ from fastapi import HTTPException, status
 from sqlalchemy import select, func, Select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.exceptions import UniqueConstraintError, ForeignKeyNotFoundError, NotFoundError
 from src.filter import apply_filters
 from src.pagination import Pagination
-from src.utils import build_relation, validate_unique_fields, validate_relationships
+from src.utils import build_relation, validate_uniqueness, validate_relationships
 
 from math import ceil
 
@@ -64,19 +65,12 @@ class CRUDRepository(Generic[ModelType]):
             database: AsyncSession,
             preloads: list[str] | None = None,
     ) -> list[ModelType]:
-        preloads = preloads if preloads else []
-
+        preloads = preloads or []
         stmt = select(self.model).options(*build_relation(self.model, preloads))
         if filters:
             stmt = self.filter_callback(stmt, self.model, filters)
 
-        objs = (await database.execute(stmt)).unique().scalars().all()
-        if not objs:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"{self.model.__name__} with id {id} does not exist"
-            )
-
+        objs = (await database.execute(stmt)).unique().scalars().all() or []
         return list(objs)
 
     async def create(
@@ -91,17 +85,11 @@ class CRUDRepository(Generic[ModelType]):
         relationship_fields = relationship_fields if relationship_fields else []
         preloads = preloads if preloads else []
 
-        if not await validate_unique_fields(self.model, data, database, unique_fields):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"{self.model.__name__} with the same fields already exists"
-            )
+        if not await validate_uniqueness(self.model, data, database, unique_fields):
+            raise UniqueConstraintError()
 
         if not await validate_relationships(self.model, data, database, relationship_fields):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Some foreign keys does not exist"
-            )
+            raise ForeignKeyNotFoundError()
 
         many_to_many = []
         nested_objects = {}
@@ -123,10 +111,7 @@ class CRUDRepository(Generic[ModelType]):
                     child_obj = rel_model(**child_data)
                     child_relationship_fields = [rel.key for rel in rel_model.__mapper__.relationships]
                     if not await validate_relationships(rel_model, child_data, database, child_relationship_fields):
-                        raise HTTPException(
-                            status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="Some foreign keys does not exist"
-                        )
+                        raise ForeignKeyNotFoundError()
                     database.add(child_obj)
                     created_children.append(child_obj)
 
@@ -172,7 +157,7 @@ class CRUDRepository(Generic[ModelType]):
 
         created_objects = []
         for data in data_list:
-            if not await validate_unique_fields(self.model, data, database, unique_fields):
+            if not await validate_uniqueness(self.model, data, database, unique_fields):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"{self.model.__name__} with the same fields already exists"
@@ -231,17 +216,16 @@ class CRUDRepository(Generic[ModelType]):
         database: AsyncSession,
         unique_fields: list[str] | None = None,
         relationship_fields: list[str] | None = None,
+        overwrite_relationships: list[str] | None = None,
         preloads: list[str] | None = None,
     ) -> ModelType:
-        unique_fields = unique_fields if unique_fields else []
-        relationship_fields = relationship_fields if relationship_fields else []
-        preloads = preloads if preloads else []
+        unique_fields = unique_fields or []
+        relationship_fields = relationship_fields or []
+        overwrite_relationships = overwrite_relationships or []
+        preloads = preloads or []
 
-        if not await validate_unique_fields(self.model, data, database, unique_fields, exclude_ids=[id]):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"{self.model.__name__} with id the same fields already exists"
-            )
+        if not await validate_uniqueness(self.model, data, database, unique_fields, exclude_ids=[id]):
+            raise UniqueConstraintError()
 
         options = build_relation(self.model, relationship_fields)
         stmt = select(self.model).options(*options).where(self.model.id == id)
@@ -249,16 +233,10 @@ class CRUDRepository(Generic[ModelType]):
         obj = result.scalars().first()
 
         if not obj:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"{self.model.__name__} with id {id} does not exist"
-            )
+            raise NotFoundError(self.model.__name__, id)
 
         if not await validate_relationships(self.model, data, database, relationship_fields):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Some foreign keys does not exist"
-            )
+            raise ForeignKeyNotFoundError()
 
         for field, raw_value in data.items():
             if field.endswith("_ids"):
@@ -269,23 +247,22 @@ class CRUDRepository(Generic[ModelType]):
                 rel = self.model.__mapper__.relationships[rel_field]
                 rel_model = rel.mapper.class_
 
-                ids = data[field]
-                if not isinstance(ids, list):
-                    ids = [ids]
+                ids = raw_value if isinstance(raw_value, list) else [raw_value]
 
-                result = await database.execute(
-                    select(rel_model).where(rel_model.id.in_(ids))
-                )
+                result = await database.execute(select(rel_model).where(rel_model.id.in_(ids)))
                 related_objs = result.scalars().all()
 
-                rel_list = getattr(obj, field)
-                rel_list.clear()
-                await database.flush()
-                rel_list.extend(related_objs)
+                rel_list = getattr(obj, rel_field)
+                if rel_field in overwrite_relationships:
+                    rel_list.clear()
+                    await database.flush()
 
+                existing_ids = {o.id for o in rel_list}
+                for o in related_objs:
+                    if o.id not in existing_ids:
+                        rel_list.append(o)
                 continue
 
-            # Якщо поле є relationship і містить список dict → створюємо дочірні об'єкти
             if field in self.model.__mapper__.relationships and (
                     isinstance(raw_value, dict)
                     or (isinstance(raw_value, list) and raw_value and isinstance(raw_value[0], dict))
@@ -298,49 +275,50 @@ class CRUDRepository(Generic[ModelType]):
                 children = []
                 for child_data in data_list:
                     child_obj = rel_model(**child_data)
-                    child_relationship_fields = [rel.key for rel in rel_model.__mapper__.relationships]
+                    child_relationship_fields = [r.key for r in rel_model.__mapper__.relationships]
                     if not await validate_relationships(rel_model, child_data, database, child_relationship_fields):
-                        raise HTTPException(
-                            status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="Some foreign keys does not exist"
-                        )
+                        raise ForeignKeyNotFoundError()
                     children.append(child_obj)
 
                 rel_list = getattr(obj, field)
-                rel_list.clear()
-                await database.flush()
-                rel_list.extend(children)
+                if field in overwrite_relationships:
+                    rel_list.clear()
+                    await database.flush()
+
+                existing_keys = {(c.__class__, getattr(c, "id", None)) for c in rel_list}
+                for child in children:
+                    key = (child.__class__, getattr(child, "id", None))
+                    if key not in existing_keys:
+                        rel_list.append(child)
                 continue
 
-            # Інакше — просте поле
             if hasattr(obj, field):
                 setattr(obj, field, raw_value)
 
         database.add(obj)
         await database.commit()
 
-        for relationship_filed in relationship_fields:
-            if isinstance(getattr(obj, relationship_filed), list) and relationship_filed not in preloads:
-                setattr(obj, relationship_filed, [])
+        if preloads:
+            options = build_relation(self.model, preloads)
+            stmt = select(self.model).options(*options).where(self.model.id == obj.id)
+            result = await database.execute(stmt)
+            return result.scalars().first()
 
-        if not preloads:
-            return obj
+        return obj
 
-        options = build_relation(self.model, preloads)
-        stmt = select(self.model).options(*options).where(self.model.id == obj.id)
-        result = await database.execute(stmt)
-        return result.scalars().first()
-
-    async def delete(self, id: int, database: AsyncSession) -> None:
-        stmt = select(self.model).where(self.model.id == id)
+    async def delete(
+            self,
+            id_: int,
+            database: AsyncSession,
+            relationship_fields: list[str] | None = None,
+    ) -> None:
+        options = build_relation(self.model, relationship_fields)
+        stmt = select(self.model).options(*options).where(self.model.id == id_)
         result = await database.execute(stmt)
         obj = result.scalars().first()
 
         if not obj:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"{self.model.__name__} with id {id} does not exist"
-            )
+            raise NotFoundError(self.model.__name__, id_)
 
         await database.delete(obj)
         await database.commit()

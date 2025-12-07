@@ -12,6 +12,7 @@ from src.auth.models import TokenInfo, UserInfo, UserPaginationResponse, ScopeIn
 from src.auth.schemas import User, Scope, Scopes, Role
 from src.auth.utils import generate_jwt_token, TokenType, generate_payload
 from src.config import JWTSettings
+from src.exceptions import UniqueConstraintError
 from src.pagination import Pagination
 from src.repository import CRUDRepository
 from src.services import GenericServices
@@ -61,7 +62,7 @@ class AuthServices(GenericServices[User, UserInfo]):
                 relationship_fields=relationship_fields,
                 preloads=preloads,
             )
-        except HTTPException:
+        except UniqueConstraintError:
             return None
 
     async def update(
@@ -186,7 +187,7 @@ class ScopeServices(GenericServices[Scope, ScopeInfo]):
                     unique_fields=["name"],
                 )
                 result.append(ScopeInfo.model_validate(scope, from_attributes=True))
-            except HTTPException:
+            except UniqueConstraintError:
                 continue
 
         return result

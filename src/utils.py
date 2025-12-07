@@ -55,7 +55,7 @@ async def validate_relationships(
 
             stmt = select(related_model).where(related_model.id.in_(raw_values))
             result = await database.execute(stmt)
-            if not result.scalars().all():
+            if len(raw_values) != len(result.scalars().all()):
                 return False
 
         else:
@@ -83,8 +83,7 @@ async def validate_relationships(
 
     return True
 
-
-async def validate_unique_fields(
+async def validate_uniqueness(
         model_type: Type,
         data: dict,
         database: AsyncSession,

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, validator, field_validator
 
 from src.auth.models import UserInfo
 from src.equipment.models import EquipmentInfo
@@ -14,12 +14,12 @@ class RepairRequestStateInfo(BaseModel):
     status: RepairRequestStatus
     responsible_user: UserInfo | None
 
-class RepairRequestFilters(BaseModel):
-    pass
-
 class RepairRequestStateCreate(BaseModel):
     status: RepairRequestStatus
     responsible_user_id: int | None
+
+class RepairRequestFilters(BaseModel):
+    pass
 
 class FileCreate(BaseModel):
     file_path: str
@@ -32,8 +32,8 @@ class RepairRequestInfo(BaseModel):
     id: int
     description: str
     urgency_level: UrgencyLevel
-    manager_note: str
-    engineer_note: str
+    manager_note: str | None
+    engineer_note: str | None
 
     photos: list[FileInfo]
     failure_types: list[FailureTypeInfo]
@@ -44,11 +44,6 @@ class RepairRequestInfo(BaseModel):
 class RepairRequestCreate(BaseModel):
     description: str
     urgency_level: UrgencyLevel
-    manager_note: str
-    engineer_note: str
-
-    failure_types_ids: list[int]
-    used_spare_parts_ids: list[int]
     equipment_id: int
 
 class RepairRequestUpdate(BaseModel):
@@ -58,4 +53,4 @@ class RepairRequestUpdate(BaseModel):
 
     failure_types_ids: list[int] | None = None
     used_spare_parts_ids: list[int] | None = None
-    new_state: RepairRequestStateCreate | None = None
+    state_history: RepairRequestStateCreate | None = None

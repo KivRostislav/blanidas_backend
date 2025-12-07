@@ -18,3 +18,11 @@ def on_repair_request_created(to: str, mailer: MailerService, payload: RepairReq
         payload=payload.model_dump(),
         to=to,
     )
+
+@on(EventTypes.health_check.value)
+def on_health_check_created(to: str, mailer: MailerService):
+    mailer.send_message(
+        template=mailer.settings.health_check_template,
+        payload={},
+        to=to,
+    )
