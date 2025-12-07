@@ -81,7 +81,10 @@ async def update_spare_part_endpoint(
             "supplier",
             "compatible_models",
         ],
-        overwrite_relationships=["locations"],
+        overwrite_relationships=[
+            "locations",
+            "compatible_models",
+        ],
         preloads=[
             "compatible_models",
             "supplier",

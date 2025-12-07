@@ -96,7 +96,7 @@ class RepairRequestServices(GenericServices[RepairRequest, RepairRequestInfo]):
                     file.write(photo_content)
                     saved_files.append(path)
         except Exception as e:
-            await super().delete(id=repair_request.id, database=database)
+            await super().delete(id_=repair_request.id, database=database)
             background_tasks.add_task(lambda: (os.remove(path) for path in saved_files))
             raise e
 

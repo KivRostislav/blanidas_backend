@@ -61,7 +61,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.include_router(router)
 
-@app.middleware("http")
+# @app.middleware("http")
 async def error_handler(request: Request, call_next):
     try:
         response = await call_next(request)

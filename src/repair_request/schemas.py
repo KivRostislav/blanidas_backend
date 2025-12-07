@@ -17,8 +17,8 @@ class RepairRequestStatus(str, Enum):
 class SparePartRepairRequest(BaseDatabaseModel):
     __tablename__ = "spare_part_repair_request"
 
-    spare_part_id: Mapped[int] = mapped_column(ForeignKey("spare_part.id"), primary_key=True)
-    repair_request_id: Mapped[int] = mapped_column(ForeignKey("repair_request.id"), primary_key=True)
+    spare_part_id: Mapped[int] = mapped_column(ForeignKey("spare_part.id", ondelete="CASCADE"), primary_key=True)
+    repair_request_id: Mapped[int] = mapped_column(ForeignKey("repair_request.id", ondelete="CASCADE"), primary_key=True)
 
 class UrgencyLevel(str, Enum):
     critical = "critical"
@@ -31,7 +31,7 @@ class RepairRequestState(BaseDatabaseModel):
     created_at: Mapped[datetime] = mapped_column()
     status: Mapped[RepairRequestStatus] = mapped_column()
 
-    responsible_user_id: Mapped[int | None] = mapped_column(ForeignKey("user.id"), nullable=True)
+    responsible_user_id: Mapped[int | None] = mapped_column(ForeignKey("user.id", ondelete="SET NULL"), nullable=True)
     responsible_user: Mapped["User"] = relationship(back_populates="repair_request_states", lazy="noload")
 
     repair_request_id: Mapped[int] = mapped_column(ForeignKey("repair_request.id", ondelete="CASCADE"))
@@ -81,5 +81,5 @@ class RepairRequest(BaseDatabaseModel):
         lazy="noload"
     )
 
-    equipment_id: Mapped[int | None] = mapped_column(ForeignKey("equipment.id"), nullable=True)
+    equipment_id: Mapped[int | None] = mapped_column(ForeignKey("equipment.id", ondelete="SET NULL"), nullable=True)
     equipment: Mapped["Equipment"] = relationship(back_populates="repair_requests", lazy="noload")

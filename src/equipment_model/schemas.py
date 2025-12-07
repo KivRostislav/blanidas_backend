@@ -20,5 +20,5 @@ class EquipmentModel(BaseDatabaseModel):
 class EquipmentModelSparePart(BaseDatabaseModel):
     __tablename__ = "equipment_model_spare_part"
 
-    spare_part_id: Mapped[int] = mapped_column(ForeignKey("spare_part.id"), primary_key=True)
-    equipment_model_id: Mapped[int] = mapped_column(ForeignKey("equipment_model.id"), primary_key=True)
+    spare_part_id: Mapped[int] = mapped_column(ForeignKey("spare_part.id", ondelete="CASCADE"), primary_key=True)
+    equipment_model_id: Mapped[int] = mapped_column(ForeignKey("equipment_model.id", ondelete="CASCADE"), primary_key=True)

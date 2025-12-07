@@ -1,13 +1,15 @@
 PHONY: venv check-deps update-deps install-deps isort black mypy flake8 bandit lint test migrate serve
 
-
 VENV=.venv
-PYTHON=PYTHONPATH=$(pwd) $(VENV)/bin/python3
+PYTHON=$(VENV)/bin/python3
+PIP=$(VENV)/bin/pip
+export PYTHONPATH := $(PWD)
 
+# --- Створення віртуального середовища та встановлення залежностей ---
 venv: requirements-dev.txt Makefile
 	python3 -m pip install --upgrade pip setuptools wheel
 	python3 -m venv $(VENV)
-	$(PYTHON) -m pip install -r requirements-dev.txt
+	$(PIP) install -r requirements-dev.txt
 
 check-deps:
 	$(PYTHON) -m pur -r requirements-dev.txt -d
@@ -16,8 +18,9 @@ update-deps:
 	$(PYTHON) -m pur -r requirements-dev.txt
 
 install-deps:
-	$(PYTHON) -m pip install -r requirements-dev.txt
+	$(PIP) install -r requirements-dev.txt
 
+# --- Статичний аналіз ---
 isort:
 	$(PYTHON) -m isort --check-only .
 
@@ -35,11 +38,14 @@ bandit:
 
 lint: isort black mypy flake8 bandit
 
+# --- Тести ---
 test:
 	$(PYTHON) -m pytest
 
+# --- Міграції ---
 migrate:
-	$(PYTHON) -m alembic upgrade head
+	PYTHONPATH=$(PWD) $(PYTHON) -m alembic upgrade head
 
+# --- Сервер ---
 serve:
-	$(PYTHON) -m uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+	PYTHONPATH=$(PWD) $(PYTHON) -m uvicorn src.main:app --reload --host 0.0.0.0 --port 8000

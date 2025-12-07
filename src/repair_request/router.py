@@ -93,7 +93,7 @@ async def update_repair_request_endpoint(
             "used_spare_parts",
             "state_history",
         ],
-        # dfgdgdfgfdgdf
+        overwrite_relationships=["failure_types"],
         preloads=[
             "failure_types",
             "used_spare_parts",
