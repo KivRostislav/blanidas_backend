@@ -71,7 +71,7 @@ async def update_user_endpoint(
         )]
 ) -> UserInfo:
     return await auth_services.update(
-        id=model.id,
+        id_=model.id,
         data=model.model_dump(exclude_none=True),
         database=database,
         unique_fields=["username", "email"],

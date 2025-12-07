@@ -67,7 +67,7 @@ class AuthServices(GenericServices[User, UserInfo]):
 
     async def update(
             self,
-            id: int,
+            id_: int,
             data: dict,
             database: AsyncSession,
             unique_fields: list[str] | None = None,
@@ -79,7 +79,7 @@ class AuthServices(GenericServices[User, UserInfo]):
             del data["password"]
 
         return await super().update(
-            id=id,
+            id_=id_,
             data=data,
             database=database,
             unique_fields=unique_fields,

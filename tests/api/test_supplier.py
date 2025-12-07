@@ -10,6 +10,7 @@ from tests.factories.supplier import SupplierORMFactory, SupplierCreateFactory, 
 from tests.general import general_test_list_endpoint, general_test_create_endpoint, general_test_delete_endpoint, \
     general_test_update_endpoint
 
+api_url = "/api/suppliers/"
 
 @pytest.mark.asyncio
 async def test_get_supplier_list_endpoint(
@@ -22,7 +23,7 @@ async def test_get_supplier_list_endpoint(
         session=session,
         model_type=Supplier,
         orm_factory=supplier_orm_factory,
-        url="/suppliers/",
+        url=api_url,
         page=3,
         limit=8,
         total=20,
@@ -38,7 +39,7 @@ async def test_create_supplier_endpoint(
         client=client,
         session=session,
         create_factory=supplier_create_factory,
-        url="/suppliers/",
+        url=api_url,
         model_type=Supplier,
     )
 
@@ -54,7 +55,7 @@ async def test_update_supplier_endpoint(
         session=session,
         orm_factory=supplier_orm_factory,
         update_factory=supplier_update_factory,
-        url="/suppliers/",
+        url=api_url,
         model_type=Supplier,
     )
 
@@ -68,7 +69,7 @@ async def test_delete_supplier_endpoint(
         client=client,
         session=session,
         orm_factory=supplier_orm_factory,
-        url="/suppliers/{0}",
+        url=f"{api_url}{{0}}",
         model=Supplier,
     )
 

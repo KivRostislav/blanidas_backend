@@ -34,6 +34,8 @@ class RepairRequestInfo(BaseModel):
     urgency_level: UrgencyLevel
     manager_note: str | None
     engineer_note: str | None
+    created_at: datetime
+    completed_at: datetime | None
 
     photos: list[FileInfo]
     failure_types: list[FailureTypeInfo]

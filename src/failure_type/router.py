@@ -38,7 +38,7 @@ async def update_failure_type_endpoint(
         database: DatabaseSession,
 ) -> FailureTypeInfo:
     return await services.update(
-        id=model.id,
+        id_=model.id,
         data=model.model_dump(exclude_none=True),
         database=database,
         unique_fields=["name"]

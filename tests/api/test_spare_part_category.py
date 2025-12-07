@@ -11,6 +11,7 @@ from tests.factories.spare_part_category import SparePartCategoryORMFactory, Spa
 from tests.general import general_test_list_endpoint, general_test_create_endpoint, general_test_delete_endpoint, \
     general_test_update_endpoint
 
+api_url = "/api/spare-part-categories/"
 
 @pytest.mark.asyncio
 async def test_get_spare_part_category_list_endpoint(
@@ -23,7 +24,7 @@ async def test_get_spare_part_category_list_endpoint(
         session=session,
         model_type=SparePartCategory,
         orm_factory=spare_part_category_orm_factory,
-        url="/spare-part-categories/",
+        url=api_url,
         page=3,
         limit=8,
         total=20,
@@ -39,7 +40,7 @@ async def test_create_spare_part_category_endpoint(
         client=client,
         session=session,
         create_factory=spare_part_category_create_factory,
-        url="/spare-part-categories/",
+        url=api_url,
         model_type=SparePartCategory,
     )
 
@@ -55,7 +56,7 @@ async def test_update_spare_part_category_endpoint(
         session=session,
         orm_factory=spare_part_category_orm_factory,
         update_factory=spare_part_category_update_factory,
-        url="/spare-part-categories/",
+        url=api_url,
         model_type=SparePartCategory,
     )
 
@@ -70,7 +71,7 @@ async def test_delete_manufacturer_endpoint(
         client=client,
         session=session,
         orm_factory=spare_part_category_orm_factory,
-        url="/spare-part-categories/{0}",
+        url=f"{api_url}{{0}}",
         model=SparePartCategory,
     )
 

@@ -1,7 +1,9 @@
+import logging
 from collections.abc import Callable
 from typing import Generic, TypeVar, Type, Any
 
 from fastapi import HTTPException, status
+from fastapi.logger import logger
 from sqlalchemy import select, func, Select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,7 +16,6 @@ from math import ceil
 
 ModelType = TypeVar("ModelType")
 FilterCallback = Callable[[Select[Any], Type[ModelType], dict[str, Any]], Select[Any]]
-
 
 class CRUDRepository(Generic[ModelType]):
     def __init__(self, model: Type[ModelType], filter_callback: FilterCallback = apply_filters):
@@ -211,7 +212,7 @@ class CRUDRepository(Generic[ModelType]):
 
     async def update(
         self,
-        id: int,
+        id_: int,
         data: dict,
         database: AsyncSession,
         unique_fields: list[str] | None = None,
@@ -224,16 +225,16 @@ class CRUDRepository(Generic[ModelType]):
         overwrite_relationships = overwrite_relationships or []
         preloads = preloads or []
 
-        if not await validate_uniqueness(self.model, data, database, unique_fields, exclude_ids=[id]):
+        if not await validate_uniqueness(self.model, data, database, unique_fields, exclude_ids=[id_]):
             raise UniqueConstraintError()
 
         options = build_relation(self.model, relationship_fields)
-        stmt = select(self.model).options(*options).where(self.model.id == id)
+        stmt = select(self.model).options(*options).where(self.model.id == id_)
         result = await database.execute(stmt)
         obj = result.scalars().first()
 
         if not obj:
-            raise NotFoundError(self.model.__name__, id)
+            raise NotFoundError(self.model.__name__, id_)
 
         if not await validate_relationships(self.model, data, database, relationship_fields):
             raise ForeignKeyNotFoundError()
@@ -312,6 +313,8 @@ class CRUDRepository(Generic[ModelType]):
             database: AsyncSession,
             relationship_fields: list[str] | None = None,
     ) -> None:
+        relationship_fields = relationship_fields or []
+
         options = build_relation(self.model, relationship_fields)
         stmt = select(self.model).options(*options).where(self.model.id == id_)
         result = await database.execute(stmt)

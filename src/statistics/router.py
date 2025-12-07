@@ -1,13 +1,30 @@
-from fastapi import APIRouter
+from datetime import date, datetime
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Query
 
 from src.database import DatabaseSession
-from src.summary.models import SummaryResponse
-from src.summary.services import SummaryServices
+from src.statistics.models import StatisticsTimeStep, TimeFrame, StatisticsResponse
+from src.statistics.services import StatisticsServices
 
 
 router = APIRouter(prefix="/statistics", tags=["Statistics"])
 
-@router.get("/", response_model=SummaryResponse)
-async def get_statistics_endpoint(schema: str, database: DatabaseSession) -> SummaryResponse:
-    return (await SummaryServices.get(database=database, schema=schema)).model_dump()
+def get_timeframe(
+        from_date: datetime = Query(default=datetime.min),
+        to_date: datetime = Query(default=datetime.today()),
+        step: StatisticsTimeStep = Query(default=StatisticsTimeStep.month),
+) -> TimeFrame:
+    return TimeFrame(
+        from_date=from_date,
+        to_date=to_date,
+        step=step,
+    )
+
+@router.get("/", response_model=StatisticsResponse)
+async def get_statistics_endpoint(
+        database: DatabaseSession,
+        timeframe: Annotated[TimeFrame, Depends(get_timeframe)],
+) -> StatisticsResponse:
+    return await StatisticsServices.get(database=database, data=timeframe.model_dump())
 

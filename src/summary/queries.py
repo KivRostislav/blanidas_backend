@@ -88,7 +88,7 @@ in_stock_subquery = build_quantity_subquery(func.coalesce(func.sum(lq.quantity),
 low_stock_subquery = build_quantity_subquery(func.coalesce(func.sum(lq.quantity), 0) < SparePart.min_quantity)
 out_of_stock_subquery = build_quantity_subquery(func.coalesce(func.sum(lq.quantity), 0) == 0)
 spare_part_rules = {
-    "total": lambda db: db.scalar(select(func.count()).select_from(m)),
+    "total": lambda db: db.scalar(select(func.count()).select_from(SparePart)),
     "in_stock": lambda db: db.scalar(select(func.count()).select_from(in_stock_subquery)),
     "low_stock": lambda db: db.scalar(select(func.count()).select_from(low_stock_subquery)),
     "out_of_stock": lambda db: db.scalar(select(func.count()).select_from(out_of_stock_subquery)),

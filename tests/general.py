@@ -15,6 +15,8 @@ from src.institution_type.schemas import InstitutionType
 from src.manufacturer.schemas import Manufacturer
 from src.pagination import Pagination, PaginationResponse
 
+from tests.conftest import *
+
 FactoryType = Callable[[], BaseDatabaseModel]
 RelationshipFactoryValueType = FactoryType | list[FactoryType] | "RelationshipFactoryType"
 RelationshipFactoryType = dict[str, RelationshipFactoryValueType]
@@ -142,38 +144,44 @@ async def general_test_list_endpoint(
 
     await session.rollback()
 
+
 async def general_test_create_endpoint(
     client: AsyncClient,
     session: AsyncSession,
     url: str,
     create_factory: ModelFactory,
     model_type: Type,
-    relationships: RelationshipFactoryType | None = None,
-    preloads: list[str] | None = None,
+    preloads: list[str] | None = None
 ):
-    relationships = {} if relationships is None else relationships
-    preloads = [] if preloads is None else preloads
+    preloads = preloads or []
     create_obj = create_factory.build()
 
     relationship_objs = {}
-    for field, factory in relationships.items():
-        assert hasattr(model_type, field), f"{field} not found in relationships"
-        relationship_objs[field] = await build_related_recursive(session, factory)
-
-    for relationship_obj in relationship_objs.values():
-        if type(relationship_obj) is list:
-            session.add_all(relationship_obj)
+    for rel in model_type.__mapper__.relationships:
+        if rel.secondary is not None:
             continue
-        session.add(relationship_obj)
+
+        child_model = rel.mapper.class_
+        factory_name = f"{child_model.__name__}ORMFactory"
+        if factory_name in globals():
+            factory = globals()[factory_name]
+        else:
+            continue
+
+        child_obj = factory.build()
+        if rel.uselist:
+            relationship_objs[rel.key] = [child_obj]
+            session.add_all([child_obj])
+        else:
+            relationship_objs[rel.key] = child_obj
+            session.add(child_obj)
+
+        if rel.uselist:
+            setattr(create_obj, rel.key + "_ids", [child_obj.id])
+        else:
+            setattr(create_obj, rel.key + "_id", child_obj.id)
+
     await session.flush()
-
-    for field, obj in relationship_objs.items():
-        if type(obj) is list:
-            assert hasattr(create_obj, field + "_ids"), f"{field + '_id'} not found in relationships"
-            setattr(create_obj, field + "_ids", [x.id for x in obj])
-            continue
-        assert hasattr(create_obj, field + "_id"), f"{field + '_id'} not found in relationships"
-        setattr(create_obj, field + "_id", obj.id)
 
     obj_data = create_obj.model_dump()
     response = await client.post(url, json=obj_data)
@@ -188,14 +196,12 @@ async def general_test_create_endpoint(
                 assert isinstance(resp_val, list)
                 assert len(resp_val) == len(value)
                 for r_item, o_item in zip(resp_val, value):
-                    if hasattr(o_item, "__dict__"):
-                        await check_preloads(r_item, {k: getattr(o_item, k) for k in preloads if hasattr(o_item, k)})
+                    await check_preloads(r_item, {k: getattr(o_item, k) for k in preloads if hasattr(o_item, k)})
             else:
-                assert "id" in resp_val
                 assert resp_val["id"] == value.id
                 await check_preloads(resp_val, {k: getattr(value, k) for k in preloads if hasattr(value, k)})
 
-    if relationships:
+    if relationship_objs:
         response_data = response.json()
         await check_preloads(response_data, relationship_objs)
 
@@ -207,21 +213,20 @@ async def general_test_create_endpoint(
             obj_copy = obj.model_copy()
             if isinstance(value, list):
                 setattr(obj_copy, field + "_ids", [99999999])
-            else:
-                setattr(obj_copy, field + "_id", 99999999)
-            response = await client.post(url, json=obj_copy.model_dump())
-            assert response.status_code == 400
-            if isinstance(value, list):
                 for v in value:
                     await check_invalid_ids(v, {k: getattr(v, k) for k in preloads if hasattr(v, k)})
             else:
+                setattr(obj_copy, field + "_id", 99999999)
                 await check_invalid_ids(value, {k: getattr(value, k) for k in preloads if hasattr(value, k)})
+
+            response = await client.post(url, json=obj_copy.model_dump())
+            assert response.status_code == 400
 
     await check_invalid_ids(create_obj, relationship_objs)
 
-
     response = await client.post(url, json=obj_data)
     assert response.status_code == 400
+
     await session.rollback()
 
 
@@ -232,36 +237,39 @@ async def general_test_update_endpoint(
     model_type: Type,
     orm_factory: SQLAlchemyFactory,
     update_factory: ModelFactory,
-    relationships: dict[str, Callable[[], BaseDatabaseModel]] | None = None,
-    preloads: list[str] | None = None,
+    preloads: list[str] | None = None
 ):
-    relationships = {} if relationships is None else relationships
-    preloads = [] if preloads is None else preloads
-    update_obj = update_factory.build()
+    preloads = preloads or []
 
+    update_obj = update_factory.build()
     payload = update_obj.model_dump()
     response = await client.put(url, json=payload)
     assert response.status_code == 404
 
     relationship_objs = {}
-    for field, factory in relationships.items():
-        assert hasattr(model_type, field), f"{field} not found in relationships"
-        relationship_objs[field] = await build_related_recursive(session, factory)
-
-    for relationship_obj in relationship_objs.values():
-        if type(relationship_obj) is list:
-            session.add_all(relationship_obj)
+    for rel in model_type.__mapper__.relationships:
+        if rel.secondary is not None:
             continue
-        session.add(relationship_obj)
-    await session.flush()
 
-    for field, obj in relationship_objs.items():
-        if type(obj) is list:
-            assert hasattr(update_obj, field + "_ids"), f"{field + '_id'} not found in relationships"
-            setattr(update_obj, field + "_ids", [x.id for x in obj])
+        child_model = rel.mapper.class_
+        factory_name = f"{child_model.__name__}Factory"
+        if factory_name in globals():
+            factory = globals()[factory_name]
+        else:
             continue
-        assert hasattr(update_obj, field + "_id"), f"{field + '_id'} not found in relationships"
-        setattr(update_obj, field + "_id", obj.id)
+
+        child_obj = factory.build()
+        if rel.uselist:
+            relationship_objs[rel.key] = [child_obj]
+            session.add_all([child_obj])
+        else:
+            relationship_objs[rel.key] = child_obj
+            session.add(child_obj)
+
+        if rel.uselist:
+            setattr(update_obj, rel.key + "_ids", [child_obj.id])
+        else:
+            setattr(update_obj, rel.key + "_id", child_obj.id)
 
     orm_obj = orm_factory.build()
     session.add(orm_obj)
@@ -271,26 +279,23 @@ async def general_test_update_endpoint(
     payload["id"] = orm_obj.id
 
     response = await client.put(url, json=payload)
-    print(response.status_code, response.json())
     assert response.status_code == 200
 
-    async def check_preloads(response_data, rel_objs):
+    async def check_preloads(resp_data, rel_objs):
         for field, value in rel_objs.items():
-            if field not in response_data:
+            if field not in resp_data:
                 continue
-            resp_val = response_data[field]
+            resp_val = resp_data[field]
             if isinstance(value, list):
                 assert isinstance(resp_val, list)
                 assert len(resp_val) == len(value)
                 for r_item, o_item in zip(resp_val, value):
-                    if hasattr(o_item, "__dict__"):
-                        await check_preloads(r_item, {k: getattr(o_item, k) for k in preloads if hasattr(o_item, k)})
+                    await check_preloads(r_item, {k: getattr(o_item, k) for k in preloads if hasattr(o_item, k)})
             else:
-                assert "id" in resp_val
                 assert resp_val["id"] == value.id
                 await check_preloads(resp_val, {k: getattr(value, k) for k in preloads if hasattr(value, k)})
 
-    if relationships:
+    if relationship_objs:
         response_data = response.json()
         await check_preloads(response_data, relationship_objs)
 
@@ -299,21 +304,21 @@ async def general_test_update_endpoint(
             obj_copy = obj.model_copy()
             if isinstance(value, list):
                 setattr(obj_copy, field + "_ids", [99999999])
-            else:
-                setattr(obj_copy, field + "_id", 99999999)
-            response = await client.put(url, json=obj_copy.model_dump())
-            assert response.status_code == 400
-            if isinstance(value, list):
                 for v in value:
                     await check_invalid_ids(v, {k: getattr(v, k) for k in preloads if hasattr(v, k)})
             else:
+                setattr(obj_copy, field + "_id", 99999999)
                 await check_invalid_ids(value, {k: getattr(value, k) for k in preloads if hasattr(value, k)})
+
+            response = await client.put(url, json=obj_copy.model_dump())
+            assert response.status_code == 400
 
     await check_invalid_ids(update_obj, relationship_objs)
 
     stmt = select(model_type).where(model_type.id == orm_obj.id)
     db_obj = (await session.execute(stmt)).scalars().first()
     assert db_obj is not None
+
     await session.rollback()
 
 
@@ -334,6 +339,21 @@ async def general_test_delete_endpoint(
     response = await client.delete(url.format(obj.id))
     print(response.status_code)
     assert response.status_code == 200
+
+    for rel in model.__mapper__.relationships:
+        if rel.secondary is not None:
+            continue
+
+        child_model = rel.mapper.class_
+        fk_column = list(rel.local_columns)[0]
+
+        stmt_child = select(child_model).where(fk_column == obj.id)
+        children = (await session.execute(stmt_child)).scalars().all()
+
+        assert not children, (
+            f"Child records in {child_model.__name__} "
+            f"related to {model.__name__}({obj.id}) were not deleted"
+        )
 
     stmt = select(model).where(model.id == obj.id)
     db_obj = (await session.execute(stmt)).scalars().first()

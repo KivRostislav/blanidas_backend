@@ -9,6 +9,7 @@ from tests.factories.equipment_category import EquipmentCategoryORMFactory, Equi
 from tests.general import general_test_list_endpoint, general_test_create_endpoint, general_test_delete_endpoint, \
     general_test_update_endpoint
 
+api_url = "/api/equipment-categories/"
 
 @pytest.mark.asyncio
 async def test_get_equipment_category_list_endpoint(
@@ -21,7 +22,7 @@ async def test_get_equipment_category_list_endpoint(
         session=session,
         model_type=EquipmentCategory,
         orm_factory=equipment_category_orm_factory,
-        url="/equipment-categories/",
+        url=api_url,
         page=3,
         limit=8,
         total=20,
@@ -37,7 +38,7 @@ async def test_create_equipment_category_endpoint(
         client=client,
         session=session,
         create_factory=equipment_category_create_factory,
-        url="/equipment-categories/",
+        url=api_url,
         model_type=EquipmentCategory,
     )
 
@@ -53,7 +54,7 @@ async def test_update_equipment_category_endpoint(
         session=session,
         orm_factory=equipment_category_orm_factory,
         update_factory=equipment_category_update_factory,
-        url="/equipment-categories/",
+        url=api_url,
         model_type=EquipmentCategory,
     )
 
@@ -68,7 +69,7 @@ async def test_delete_equipment_category_endpoint(
         client=client,
         session=session,
         orm_factory=equipment_category_orm_factory,
-        url="/equipment-categories/{0}",
+        url=f"{api_url}{{0}}",
         model=EquipmentCategory,
     )
 

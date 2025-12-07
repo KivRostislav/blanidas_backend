@@ -20,7 +20,7 @@ class SparePartServices(GenericServices[SparePart, SparePartInfo]):
 
     async def update(
             self,
-            id: int,
+            id_: int,
             data: dict,
             database: AsyncSession,
             background_tasks: BackgroundTasks | None = None,
@@ -31,7 +31,7 @@ class SparePartServices(GenericServices[SparePart, SparePartInfo]):
             preloads: list[str] | None = None,
     ) -> SparePartInfo:
         spare_part = await super().update(
-            id=id,
+            id_=id_,
             data=data,
             database=database,
             unique_fields=unique_fields,

@@ -71,6 +71,7 @@ class RepairRequestServices(GenericServices[RepairRequest, RepairRequestInfo]):
             responsible_user_id=None,
         ).model_dump()
         data["state_history"].update({"created_at": datetime.now()})
+        data["created_at"] = datetime.now()
 
         repair_request = await super().create(
             data=data,
@@ -136,7 +137,7 @@ class RepairRequestServices(GenericServices[RepairRequest, RepairRequestInfo]):
 
     async def update(
             self,
-            id: int,
+            id_: int,
             data: dict,
             database: AsyncSession,
             background_tasks: BackgroundTasks | None = None,
@@ -145,10 +146,20 @@ class RepairRequestServices(GenericServices[RepairRequest, RepairRequestInfo]):
             overwrite_relationships: list[str] | None = None,
             preloads: list[str] | None = None,
     ) -> RepairRequestInfo:
+        objs = await super().get({"id": id_}, database=database)
+        if objs and objs[0].completed_at is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Status update denied: request is already finished."
+            )
+
         if "state_history" in data:
             data["state_history"].update({"created_at": datetime.now()})
+            if data["state_history"]["status"] == RepairRequestStatus.finished:
+                data["completed_at"] = datetime.now()
+
         repair_request = await super().update(
-            id=id,
+            id_=id_,
             data=data,
             database=database,
             unique_fields=unique_fields,

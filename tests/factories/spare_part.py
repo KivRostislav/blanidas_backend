@@ -6,7 +6,7 @@ from src.spare_part.schemas import SparePart
 
 class SparePartORMFactory(SQLAlchemyFactory[SparePart]):
     supplier = Ignore()
-    institution = Ignore()
+    locations = Ignore()
     spare_part_category = Ignore()
     manufacturer = Ignore()
     compatible_models = Ignore()

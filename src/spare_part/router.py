@@ -68,7 +68,7 @@ async def update_spare_part_endpoint(
         database: DatabaseSession,
 ) -> SparePartInfo:
     return await services.update(
-        id=model.id,
+        id_=model.id,
         data=model.model_dump(exclude_none=True),
         database=database,
         mailer=mailer,

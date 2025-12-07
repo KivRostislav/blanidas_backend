@@ -14,7 +14,7 @@ from src.failure_type.router import router as failure_type_router
 from src.summary.router import router as summary_router
 from src.auth.router import router as auth_router
 from src.health_check.router import router as health_check
-
+from src.statistics.router import router as statistics_router
 
 router = APIRouter(prefix="/api")
 
@@ -33,3 +33,4 @@ router.include_router(repair_request_router)
 router.include_router(failure_type_router)
 router.include_router(summary_router)
 router.include_router(health_check)
+router.include_router(statistics_router)

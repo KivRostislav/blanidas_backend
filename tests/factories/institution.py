@@ -17,7 +17,7 @@ class InstitutionORMFactory(SQLAlchemyFactory[Institution]):
 
     institution_type = Ignore()
     equipment = Ignore()
-    spare_parts = Ignore()
+    spare_part_locations = Ignore()
 
     contact_email = Use(faker.email)
     contact_phone = Use(faker.ukrainian_phone)

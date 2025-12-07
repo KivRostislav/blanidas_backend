@@ -13,6 +13,7 @@ from tests.factories.manufacturer import ManufacturerORMFactory
 from tests.general import general_test_list_endpoint, general_test_create_endpoint, general_test_delete_endpoint, \
     general_test_update_endpoint
 
+api_url = "/api/equipment/"
 
 @pytest.mark.asyncio
 async def test_get_equipment_list_endpoint(
@@ -45,7 +46,7 @@ async def test_get_equipment_list_endpoint(
             "manufacturer",
         ],
         orm_factory=equipment_orm_factory,
-        url="/equipment/",
+        url=api_url,
         page=3,
         limit=8,
         total=20,
@@ -83,7 +84,7 @@ async def test_create_equipment_endpoint(
             "institution",
             "institution.institution_type",
         ],
-        url="/equipment/",
+        url=api_url,
         create_factory=equipment_create_factory,
     )
 
@@ -114,7 +115,7 @@ async def test_update_equipment_endpoint(
             "equipment_category",
             "manufacturer",
         ],
-        url="/equipment/",
+        url=api_url,
         orm_factory=equipment_orm_factory,
         update_factory=equipment_update_factory,
     )
@@ -129,6 +130,6 @@ async def test_delete_equipment_endpoint(
         client=client,
         session=session,
         orm_factory=equipment_orm_factory,
-        url="/equipment/{0}",
+        url=f"{api_url}{{0}}",
         model=Equipment,
     )

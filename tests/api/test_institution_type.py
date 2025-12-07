@@ -8,6 +8,7 @@ from tests.factories.institution_type import InstitutionTypeCreateFactory, Insti
 from tests.general import general_test_list_endpoint, general_test_create_endpoint, general_test_delete_endpoint, \
     general_test_update_endpoint
 
+api_url = "/api/institution-types/"
 
 @pytest.mark.asyncio
 async def test_get_institution_type_list_endpoint(
@@ -20,7 +21,7 @@ async def test_get_institution_type_list_endpoint(
         session=session,
         model_type=InstitutionType,
         orm_factory=institution_type_orm_factory,
-        url="/institution-types/",
+        url=api_url,
         page=3,
         limit=8,
         total=20,
@@ -36,7 +37,7 @@ async def test_create_institution_type_endpoint(
         client=client,
         session=session,
         create_factory=institution_type_create_factory,
-        url="/institution-types/",
+        url=api_url,
         model_type=InstitutionType,
     )
 
@@ -52,7 +53,7 @@ async def test_update_institution_type_endpoint(
         session=session,
         orm_factory=institution_type_orm_factory,
         update_factory=institution_type_update_factory,
-        url="/institution-types/",
+        url=api_url,
         model_type=InstitutionType,
     )
 
@@ -67,7 +68,7 @@ async def test_delete_institution_type_endpoint(
         client=client,
         session=session,
         orm_factory=institution_type_orm_factory,
-        url="/institution-types/{0}",
+        url=f"{api_url}{{0}}",
         model=InstitutionType,
     )
 

@@ -2,7 +2,7 @@ PHONY: venv check-deps update-deps install-deps isort black mypy flake8 bandit l
 
 
 VENV=.venv
-PYTHON=$(VENV)/bin/python3
+PYTHON=PYTHONPATH=$(pwd) $(VENV)/bin/python3
 
 venv: requirements-dev.txt Makefile
 	python3 -m pip install --upgrade pip setuptools wheel
@@ -42,4 +42,4 @@ migrate:
 	$(PYTHON) -m alembic upgrade head
 
 serve:
-	$(PYTHON) src/main.py
+	$(PYTHON) -m uvicorn src.main:app --reload --host 0.0.0.0 --port 8000

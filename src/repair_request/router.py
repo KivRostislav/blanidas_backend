@@ -85,7 +85,7 @@ async def update_repair_request_endpoint(
         database: DatabaseSession,
 ) -> RepairRequestInfo:
     return await services.update(
-        id=model.id,
+        id_=model.id,
         data=model.model_dump(exclude_none=True),
         database=database,
         relationship_fields=[

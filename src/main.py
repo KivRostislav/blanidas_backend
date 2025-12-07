@@ -1,3 +1,5 @@
+import logging
+import logging.config
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, status
@@ -10,7 +12,7 @@ from src.auth.models import ScopeCreate
 from src.auth.schemas import Scope, Role, EngineerScopes, ManagerScopes
 from src.auth.services import AuthServices, ScopeServices
 from src.config import get_settings
-from src.database import engine, session_factory, BaseDatabaseModel
+from src.database import session_factory
 import src.auth.models as auth_models
 import src.auth.schemas as auth_schemas
 
@@ -20,18 +22,14 @@ from src.router import router
 
 from .exceptions import DomainError, NotFoundError
 
-
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    async with engine.begin() as connection:
-        await connection.run_sync(BaseDatabaseModel.metadata.create_all)
     async with session_factory() as session:
         create_manager_scopes = [ScopeCreate(role=Role.manager, name=x).model_dump() for x in ManagerScopes]
         create_engineer_scopes = [ScopeCreate(role=Role.engineer, name=x).model_dump() for x in EngineerScopes]
         scope_services = ScopeServices()
         await scope_services.create_if_not_exist(create_manager_scopes, session)
         await scope_services.create_if_not_exist(create_engineer_scopes, session)
-# healthy check sdfaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaadsafasdfsadfsfsafasdfdsafasd
         stmt = select(Scope).where(and_(
             Scope.role == auth_schemas.Role.manager,
             Scope.name.in_(auth_schemas.ManagerScopes),
@@ -63,9 +61,15 @@ async def lifespan(_: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.include_router(router)
 
-@app.exception_handler(DomainError)
-async def domain_error_handler(_: Request, exc: DomainError):
-    status_code = status.HTTP_400_BAD_REQUEST
-    if isinstance(exc, NotFoundError):
-        status_code = status.HTTP_404_NOT_FOUND
-    return JSONResponse(status_code=status_code, content={"detail": exc.message})
+@app.middleware("http")
+async def error_handler(request: Request, call_next):
+    try:
+        response = await call_next(request)
+    except DomainError as exc:
+        status_code = status.HTTP_400_BAD_REQUEST
+        if isinstance(exc, NotFoundError):
+            status_code = status.HTTP_404_NOT_FOUND
+        return JSONResponse(status_code=status_code, content={"detail": exc.message})
+    except Exception:
+        return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
+    return response

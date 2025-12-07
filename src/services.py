@@ -32,7 +32,7 @@ class GenericServices(Generic[ModelType, InfoType]):
 
     async def update(
             self,
-            id: int,
+            id_: int,
             data: dict,
             database: AsyncSession,
             unique_fields: list[str] | None = None,
@@ -41,7 +41,7 @@ class GenericServices(Generic[ModelType, InfoType]):
             preloads: list[str] | None = None,
     ) -> InfoType:
         obj = await self.repo.update(
-            id=id,
+            id_=id_,
             data=data,
             database=database,
             unique_fields=unique_fields,
@@ -63,7 +63,7 @@ class GenericServices(Generic[ModelType, InfoType]):
             relationship_fields=relationship_fields
         )
 
-    async def get(self, filters: dict[str, Any], database: AsyncSession, preloads: list[str] | None = None) -> InfoType:
+    async def get(self, filters: dict[str, Any], database: AsyncSession, preloads: list[str] | None = None) -> list[InfoType]:
         objs = await self.repo.get(
             filters=filters,
             database=database,

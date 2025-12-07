@@ -52,6 +52,8 @@ class RepairRequest(BaseDatabaseModel):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     description: Mapped[str] = mapped_column()
     urgency_level: Mapped[UrgencyLevel] = mapped_column()
+    created_at: Mapped[datetime] = mapped_column()
+    completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
     manager_note: Mapped[str | None] = mapped_column(nullable=True)
     engineer_note: Mapped[str | None] = mapped_column(nullable=True)

@@ -39,12 +39,12 @@ async def update_equipment_model_endpoint(
         database: DatabaseSession,
 ) -> EquipmentModelInfo:
     return await services.update(
-        id=model.id,
+        id_=model.id,
         data=model.model_dump(exclude_none=True),
         database=database,
         unique_fields=["name"]
     )
 
-@router.delete("/{id}", response_model=None)
-async def delete_equipment_model_endpoint(id: int, database: DatabaseSession) -> None:
-    return await services.delete(id=id, database=database)
+@router.delete("/{id_}", response_model=None)
+async def delete_equipment_model_endpoint(id_: int, database: DatabaseSession) -> None:
+    return await services.delete(id_=id_, database=database)
