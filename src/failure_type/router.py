@@ -15,7 +15,7 @@ async def get_failure_type_list_endpoint(
         pagination: Pagination = Depends(),
         filters: FailureTypeFilters = Depends(),
 ) -> PaginationResponse[FailureTypeInfo]:
-    return await services.list(
+    return await services.paginate(
         database=database,
         pagination=pagination,
         filters=filters.model_dump(exclude_none=True)

@@ -2,6 +2,7 @@ from typing import Generic, TypeVar, Type, Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.equipment.models import EquipmentInfo
 from src.exceptions import NotFoundError
 from src.pagination import PaginationResponse, Pagination
 from src.repository import CRUDRepository
@@ -63,15 +64,26 @@ class GenericServices(Generic[ModelType, InfoType]):
             relationship_fields=relationship_fields
         )
 
-    async def get(self, filters: dict[str, Any], database: AsyncSession, preloads: list[str] | None = None) -> list[InfoType]:
-        objs = await self.repo.get(
-            filters=filters,
+    async def get(
+            self,
+            id_: int,
+            database: AsyncSession,
+            preloads: list[str] | None = None,
+    ) -> InfoType:
+        result = await self.repo.get(
+            filters={"id": id_},
             database=database,
             preloads=preloads
         )
-        return [self.return_type.model_validate(x.__dict__, from_attributes=True) for x in objs]
 
-    async def list(
+        if not result:
+            raise NotFoundError(
+                model_name=EquipmentInfo.__name__,
+                record_id=id_
+            )
+
+        return self.return_type.model_validate(result.__dict__, from_attributes=True)
+    async def paginate(
             self,
             database: AsyncSession,
             pagination: Pagination,
@@ -86,3 +98,12 @@ class GenericServices(Generic[ModelType, InfoType]):
         )
         result["items"] = [self.return_type.model_validate(x.__dict__, from_attributes=True) for x in result["items"]]
         return PaginationResponse.model_validate(result)
+
+
+    async def list(self, filters: dict[str, Any], database: AsyncSession, preloads: list[str] | None = None) -> list[InfoType]:
+        objs = await self.repo.list(
+            filters=filters,
+            database=database,
+            preloads=preloads
+        )
+        return [self.return_type.model_validate(x.__dict__, from_attributes=True) for x in objs]

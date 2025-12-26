@@ -1,18 +1,17 @@
-import logging
-import logging.config
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, status
 from datetime import date
 
 from sqlalchemy import and_, select
+from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 
 from src.auth.models import ScopeCreate
 from src.auth.schemas import Scope, Role, EngineerScopes, ManagerScopes
 from src.auth.services import AuthServices, ScopeServices
 from src.config import get_settings
-from src.database import session_factory
+from src.database import session_factory, BaseDatabaseModel
 import src.auth.models as auth_models
 import src.auth.schemas as auth_schemas
 
@@ -60,6 +59,14 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 app.include_router(router)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*", "http://localhost:5174/"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # @app.middleware("http")
 async def error_handler(request: Request, call_next):

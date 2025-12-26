@@ -15,7 +15,7 @@ async def get_supplier_list_endpoint(
         pagination: Pagination = Depends(),
         filters: SupplierFilters = Depends(),
 ) -> PaginationResponse[SupplierInfo]:
-    return await services.list(
+    return await services.paginate(
         database=database,
         pagination=pagination,
         filters=filters.model_dump(exclude_none=True)

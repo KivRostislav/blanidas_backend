@@ -11,7 +11,7 @@ class Equipment(BaseDatabaseModel):
     __tablename__ = "equipment"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column()
+    location: Mapped[str] = mapped_column()
     serial_number: Mapped[str] = mapped_column()
     installed: Mapped[date] = mapped_column(StringToDate)
 

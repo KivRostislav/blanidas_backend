@@ -4,21 +4,22 @@ from sqlalchemy import Sequence, or_, select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-
 def build_relation(model_type: Type, preload: Sequence[str]) -> list[Any]:
     options = []
+
     for rel in preload:
         parts = rel.split(".")
+
         attr = getattr(model_type, parts[0])
         loader = joinedload(attr)
+
         current_loader = loader
         current_model = attr.property.mapper.class_
 
         for part in parts[1:]:
             sub_attr = getattr(current_model, part)
-            next_model = sub_attr.property.mapper.class_
             current_loader = current_loader.joinedload(sub_attr)
-            current_model = next_model
+            current_model = sub_attr.property.mapper.class_
 
         options.append(current_loader)
 

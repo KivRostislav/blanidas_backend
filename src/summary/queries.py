@@ -173,7 +173,7 @@ repair_part_rules = {
 
 
 SUMMARY_RULES = {
-    "repair_request": {
+    "repair-request": {
         "response_model": RepairRequestSummary,
         "rules": repair_part_rules,
     },

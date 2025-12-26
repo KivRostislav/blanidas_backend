@@ -86,7 +86,11 @@ class TokenInfo(BaseModel):
     refresh_token: str
     token_type: str = "Bearer"
 
-class TokenGet(BaseModel):
+class LoginResponse(BaseModel):
+    token: TokenInfo
+    current_user: UserInfo
+
+class Login(BaseModel):
     email: EmailStr
     password: str
 

@@ -18,7 +18,7 @@ async def get_spare_part_list_endpoint(
         pagination: Pagination = Depends(),
         filters: SparePartFilters = Depends(),
 ) -> PaginationResponse[SparePartInfo]:
-    return await services.list(
+    return await services.paginate(
         database=database,
         pagination=pagination,
         filters=filters.model_dump(exclude_none=True),

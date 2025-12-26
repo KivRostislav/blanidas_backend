@@ -21,3 +21,5 @@ class Institution(BaseDatabaseModel):
 
     contact_email: Mapped[str] = mapped_column()
     contact_phone: Mapped[str] = mapped_column()
+
+    repair_request_used_spare_parts: Mapped[list["RepairRequestUsedSparePart"]] = relationship(back_populates="institution", lazy="noload")

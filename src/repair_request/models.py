@@ -5,6 +5,7 @@ from pydantic import BaseModel, validator, field_validator
 from src.auth.models import UserInfo
 from src.equipment.models import EquipmentInfo
 from src.failure_type.models import FailureTypeInfo
+from src.institution.models import InstitutionInfo
 from src.repair_request.schemas import UrgencyLevel, RepairRequestStatus
 from src.spare_part.models import SparePartInfo
 
@@ -28,6 +29,16 @@ class FileCreate(BaseModel):
 class FileInfo(BaseModel):
     file_path: str
 
+class CreateRepairRequestUsedSpareParts(BaseModel):
+    quantity: int
+    spare_part_id: int
+    institution_id: int
+
+class RepairRequestUsedSparePartsInfo(BaseModel):
+    quantity: int
+    spare_part: SparePartInfo | None
+    institution: InstitutionInfo | None
+
 class RepairRequestInfo(BaseModel):
     id: int
     description: str
@@ -39,7 +50,7 @@ class RepairRequestInfo(BaseModel):
 
     photos: list[FileInfo]
     failure_types: list[FailureTypeInfo]
-    used_spare_parts: list[SparePartInfo]
+    used_spare_parts: list[RepairRequestUsedSparePartsInfo]
     state_history: list[RepairRequestStateInfo]
     equipment: EquipmentInfo | None
 
@@ -54,5 +65,5 @@ class RepairRequestUpdate(BaseModel):
     engineer_note: str | None = None
 
     failure_types_ids: list[int] | None = None
-    used_spare_parts_ids: list[int] | None = None
+    used_spare_parts: list[CreateRepairRequestUsedSpareParts] | None = None
     state_history: RepairRequestStateCreate | None = None

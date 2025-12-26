@@ -15,7 +15,7 @@ async def get_equipment_list_endpoint(
         pagination: Pagination = Depends(),
         filters: EquipmentFilters = Depends(),
 ) -> PaginationResponse[EquipmentInfo]:
-    return await services.list(
+    return await services.paginate(
         database=database,
         pagination=pagination,
         filters=filters.model_dump(exclude_none=True),
@@ -27,6 +27,21 @@ async def get_equipment_list_endpoint(
             "institution.institution_type",
         ]
     )
+
+@router.get("/{id_}", response_model=EquipmentInfo)
+async def get_equipment_endpoint(id_: int, database: DatabaseSession) -> EquipmentInfo:
+    return await services.get(
+        id_=id_,
+        database=database,
+        preloads = [
+            "equipment_model",
+            "equipment_category",
+            "manufacturer",
+            "institution",
+            "institution.institution_type",
+        ]
+    )
+
 # dsfdsfdsdfsfdsdfsdfd
 @router.post("/", response_model=EquipmentInfo)
 async def create_equipment_endpoint(

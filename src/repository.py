@@ -44,7 +44,8 @@ class CRUDRepository(Generic[ModelType]):
             count_stmt = self.filter_callback(count_stmt, self.model, filters)
 
         total = (await database.execute(count_stmt)).scalar() or 0
-        stmt = stmt.offset(pagination.offset).limit(pagination.limit)
+        if pagination.limit >= 0:
+            stmt = stmt.offset(pagination.offset).limit(pagination.limit)
 
         result = await database.execute(stmt)
         items = result.unique().scalars().all()
@@ -60,20 +61,6 @@ class CRUDRepository(Generic[ModelType]):
             "has_prev": pagination.page > 1,
         }
 
-    async def get(
-            self,
-            filters: dict[str, Any],
-            database: AsyncSession,
-            preloads: list[str] | None = None,
-    ) -> list[ModelType]:
-        preloads = preloads or []
-        stmt = select(self.model).options(*build_relation(self.model, preloads))
-        if filters:
-            stmt = self.filter_callback(stmt, self.model, filters)
-
-        objs = (await database.execute(stmt)).unique().scalars().all() or []
-        return list(objs)
-
     async def create(
             self,
             data: dict,
@@ -82,9 +69,9 @@ class CRUDRepository(Generic[ModelType]):
             relationship_fields: list[str] | None = None,
             preloads: list[str] | None = None,
     ) -> ModelType:
-        unique_fields = unique_fields if unique_fields else []
-        relationship_fields = relationship_fields if relationship_fields else []
-        preloads = preloads if preloads else []
+        unique_fields = unique_fields or []
+        relationship_fields = relationship_fields or []
+        preloads = preloads or []
 
         if not await validate_uniqueness(self.model, data, database, unique_fields):
             raise UniqueConstraintError()
@@ -92,55 +79,39 @@ class CRUDRepository(Generic[ModelType]):
         if not await validate_relationships(self.model, data, database, relationship_fields):
             raise ForeignKeyNotFoundError()
 
-        many_to_many = []
-        nested_objects = {}
+        many_to_many: list[str] = []
         data_copy = data.copy()
+
         for field in relationship_fields:
-            if field in data and (
-                    isinstance(data[field], list) and isinstance(data[field][0], dict)
-                    or isinstance(data[field], dict)
-            ):
-                rel = self.model.__mapper__.relationships[field]
-                rel_model = rel.mapper.class_
-
-                created_children = []
-                data_list = data[field]
-                if not isinstance(data[field], list):
-                    data_list = [data[field]]
-
-                for child_data in data_list:
-                    child_obj = rel_model(**child_data)
-                    child_relationship_fields = [rel.key for rel in rel_model.__mapper__.relationships]
-                    if not await validate_relationships(rel_model, child_data, database, child_relationship_fields):
-                        raise ForeignKeyNotFoundError()
-                    database.add(child_obj)
-                    created_children.append(child_obj)
-
-                nested_objects[field] = created_children
-                del data_copy[field]
-
-            if field + "_ids" in data_copy:
-                del data_copy[field + "_ids"]
+            ids_key = f"{field}_ids"
+            if ids_key in data_copy:
+                del data_copy[ids_key]
                 many_to_many.append(field)
 
         obj = self.model(**data_copy)
-        for field, nested_object in nested_objects.items():
-            setattr(obj, field, nested_object)
 
         for field in many_to_many:
             rel = self.model.__mapper__.relationships[field]
             rel_model = rel.mapper.class_
 
-            ids = data[field + "_ids"]
-            result = await database.execute(select(rel_model).where(rel_model.id.in_(ids)))
+            ids = data[f"{field}_ids"]
+            result = await database.execute(
+                select(rel_model).where(rel_model.id.in_(ids))
+            )
             related_objs = result.scalars().all()
+
             getattr(obj, field).extend(related_objs)
 
         database.add(obj)
         await database.commit()
 
         preload_options = build_relation(self.model, preloads)
-        stmt = select(self.model).options(*preload_options).where(self.model.id == obj.id)
+        stmt = (
+            select(self.model)
+            .options(*preload_options)
+            .where(self.model.id == obj.id)
+        )
+
         result = await database.execute(stmt)
         return result.scalars().first()
 
@@ -209,16 +180,15 @@ class CRUDRepository(Generic[ModelType]):
         result = await database.execute(stmt)
         return list(result.scalars().all())
 
-
     async def update(
-        self,
-        id_: int,
-        data: dict,
-        database: AsyncSession,
-        unique_fields: list[str] | None = None,
-        relationship_fields: list[str] | None = None,
-        overwrite_relationships: list[str] | None = None,
-        preloads: list[str] | None = None,
+            self,
+            id_: int,
+            data: dict,
+            database: AsyncSession,
+            unique_fields: list[str] | None = None,
+            relationship_fields: list[str] | None = None,
+            overwrite_relationships: list[str] | None = None,
+            preloads: list[str] | None = None,
     ) -> ModelType:
         unique_fields = unique_fields or []
         relationship_fields = relationship_fields or []
@@ -249,7 +219,6 @@ class CRUDRepository(Generic[ModelType]):
                 rel_model = rel.mapper.class_
 
                 ids = raw_value if isinstance(raw_value, list) else [raw_value]
-
                 result = await database.execute(select(rel_model).where(rel_model.id.in_(ids)))
                 related_objs = result.scalars().all()
 
@@ -264,40 +233,12 @@ class CRUDRepository(Generic[ModelType]):
                         rel_list.append(o)
                 continue
 
-            if field in self.model.__mapper__.relationships and (
-                    isinstance(raw_value, dict)
-                    or (isinstance(raw_value, list) and raw_value and isinstance(raw_value[0], dict))
-            ):
-                rel = self.model.__mapper__.relationships[field]
-                rel_model = rel.mapper.class_
-
-                data_list = raw_value if isinstance(raw_value, list) else [raw_value]
-
-                children = []
-                for child_data in data_list:
-                    child_obj = rel_model(**child_data)
-                    child_relationship_fields = [r.key for r in rel_model.__mapper__.relationships]
-                    if not await validate_relationships(rel_model, child_data, database, child_relationship_fields):
-                        raise ForeignKeyNotFoundError()
-                    children.append(child_obj)
-
-                rel_list = getattr(obj, field)
-                if field in overwrite_relationships:
-                    rel_list.clear()
-                    await database.flush()
-
-                existing_keys = {(c.__class__, getattr(c, "id", None)) for c in rel_list}
-                for child in children:
-                    key = (child.__class__, getattr(child, "id", None))
-                    if key not in existing_keys:
-                        rel_list.append(child)
-                continue
-
             if hasattr(obj, field):
                 setattr(obj, field, raw_value)
 
         database.add(obj)
         await database.commit()
+        await database.refresh(obj)
 
         if preloads:
             options = build_relation(self.model, preloads)
@@ -306,6 +247,7 @@ class CRUDRepository(Generic[ModelType]):
             return result.scalars().first()
 
         return obj
+
 
     async def delete(
             self,
@@ -333,3 +275,31 @@ class CRUDRepository(Generic[ModelType]):
         for obj in objs:
             await database.delete(obj)
         await database.commit()
+
+    async def get(
+            self,
+            filters: dict[str, Any],
+            database: AsyncSession,
+            preloads: list[str] | None = None,
+    ) -> ModelType:
+        preloads = preloads or []
+        stmt = select(self.model).options(*build_relation(self.model, preloads))
+        if filters:
+            stmt = self.filter_callback(stmt, self.model, filters)
+
+        return (await database.execute(stmt)).unique().scalars().first()
+
+    async def list(
+            self,
+            filters: dict[str, Any],
+            database: AsyncSession,
+            preloads: list[str] | None = None,
+    ) -> list[ModelType]:
+        preloads = preloads or []
+        stmt = select(self.model).options(*build_relation(self.model, preloads))
+        if filters:
+            stmt = self.filter_callback(stmt, self.model, filters)
+
+        objs = (await database.execute(stmt)).unique().scalars().all() or []
+        return list(objs)
+

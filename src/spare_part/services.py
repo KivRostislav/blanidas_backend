@@ -8,6 +8,7 @@ from src.services import GenericServices
 from src.mailer.smtp import MailerService
 from src.mailer.models import LowStockMessagePayload
 from src.spare_part.models import SparePartInfo
+from src.spare_part.repository import SparePartRepository
 from src.spare_part.schemas import SparePart, SparePartLocationQuantity
 from src.repository import FilterCallback
 
@@ -15,6 +16,8 @@ from src.repository import FilterCallback
 class SparePartServices(GenericServices[SparePart, SparePartInfo]):
     def __init__(self, filter_callback: FilterCallback):
         super().__init__(CRUDRepository(SparePart, filter_callback), SparePartInfo)
+
+        self.repo = SparePartRepository()
         self.spare_part_location_quantity_repo = CRUDRepository(SparePartLocationQuantity)
         self.auth_repo = CRUDRepository(User)
 
@@ -30,7 +33,7 @@ class SparePartServices(GenericServices[SparePart, SparePartInfo]):
             overwrite_relationships: list[str] | None = None,
             preloads: list[str] | None = None,
     ) -> SparePartInfo:
-        spare_part = await super().update(
+        spare_part = await self.repo.update(
             id_=id_,
             data=data,
             database=database,
@@ -44,7 +47,7 @@ class SparePartServices(GenericServices[SparePart, SparePartInfo]):
         for location in spare_part.locations:
             quantity += location.quantity
         if quantity <= spare_part.min_quantity and background_tasks and mailer:
-            receivers = await self.auth_repo.get(
+            receivers = await self.auth_repo.list(
                 database=database,
                 filters={"receive_low_stock_notification": True}
             )

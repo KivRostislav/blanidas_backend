@@ -11,10 +11,10 @@ class SparePartLocationQuantity(BaseDatabaseModel):
     quantity: Mapped[int] = mapped_column()
 
     institution_id: Mapped[int | None] = mapped_column(ForeignKey("institution.id"), nullable=True)
-    institution: Mapped["Institution"] = relationship(back_populates="spare_part_locations")
+    institution: Mapped["Institution"] = relationship(back_populates="spare_part_locations", lazy="noload")
 
     spare_part_id: Mapped[int | None] = mapped_column(ForeignKey("spare_part.id", ondelete="CASCADE"))
-    spare_part: Mapped["SparePart"] = relationship(back_populates="locations")
+    spare_part: Mapped["SparePart"] = relationship(back_populates="locations", lazy="noload")
 
 
 class SparePart(BaseDatabaseModel):
@@ -47,10 +47,6 @@ class SparePart(BaseDatabaseModel):
     manufacturer_id: Mapped[int | None] = mapped_column(ForeignKey("manufacturer.id", ondelete="SET NULL"), nullable=True)
     manufacturer: Mapped["Manufacturer"] = relationship(back_populates="spare_parts", lazy="noload")
 
-    repair_requests: Mapped[list["RepairRequest"]] = relationship(
-        back_populates="used_spare_parts",
-        secondary="spare_part_repair_request",
-        lazy="noload",
-    )
+    repair_request_used_spare_parts: Mapped[list["RepairRequestUsedSparePart"]] = relationship(back_populates="spare_part", lazy="noload")
 
 

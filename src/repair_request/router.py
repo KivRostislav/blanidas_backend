@@ -24,15 +24,39 @@ async def get_repair_request_list_endpoint(
         pagination: Pagination = Depends(),
         filters: RepairRequestFilters = Depends(),
 ) -> PaginationResponse[RepairRequestInfo]:
-    return await services.list(
+    return await services.paginate(
         database=database,
         pagination=pagination,
         filters=filters.model_dump(exclude_none=True),
         preloads=[
             "equipment",
             "equipment.institution",
+            "equipment.equipment_model",
+            "equipment.equipment_category",
             "failure_types",
             "used_spare_parts",
+            "used_spare_parts.institution",
+            "used_spare_parts.spare_part",
+            "photos",
+            "state_history",
+            "state_history.responsible_user",
+        ]
+    )
+
+@router.get("/{id_}", response_model=RepairRequestInfo)
+async def get_repair_request_endpoint(id_: int, database: DatabaseSession) -> RepairRequestInfo:
+    return await services.get(
+        database=database,
+        filters={"id": id_},
+        preloads=[
+            "equipment",
+            "equipment.institution",
+            "equipment.equipment_model",
+            "equipment.equipment_category",
+            "failure_types",
+            "used_spare_parts",
+            "used_spare_parts.institution",
+            "used_spare_parts.spare_part",
             "photos",
             "state_history",
             "state_history.responsible_user",
@@ -63,13 +87,9 @@ async def create_repair_request_endpoint(
         background_tasks=background_tasks,
         mailer=mailer,
         photos=photos,
-        relationship_fields=[
-            "equipment",
-            "state_history",
-        ],
         preloads=[
-            "equipment",
             "equipment.institution",
+            "equipment.equipment_model",
             "failure_types",
             "used_spare_parts",
             "photos",
@@ -93,10 +113,12 @@ async def update_repair_request_endpoint(
             "used_spare_parts",
             "state_history",
         ],
-        overwrite_relationships=["failure_types"],
+        overwrite_relationships=["failure_types", "used_spare_parts"],
         preloads=[
             "failure_types",
             "used_spare_parts",
+            "used_spare_parts.institution",
+            "used_spare_parts.spare_part",
             "photos",
             "state_history",
             "state_history.responsible_user",

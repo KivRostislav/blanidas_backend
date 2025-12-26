@@ -16,7 +16,7 @@ async def get_equipment_model_list_endpoint(
         pagination: Pagination = Depends(),
         filters: EquipmentModelFilters = Depends(),
 ) -> PaginationResponse[EquipmentModelInfo]:
-    return await services.list(
+    return await services.paginate(
         database=database,
         pagination=pagination,
         filters=filters.model_dump(exclude_none=True)

@@ -6,7 +6,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 
 from src.auth.dependencies import allowed, current_user
 from src.auth.models import UserCreate, TokenInfo, UserUpdate, UserDelete, \
-    UserFilters, UserInfo, UserPaginationResponse, ScopeInfo, TokenGet, TokenRefresh
+    UserFilters, UserInfo, UserPaginationResponse, ScopeInfo, TokenRefresh, LoginResponse, Login
 from src.auth.schemas import Role, User, Scopes
 from src.auth.services import AuthServices, ScopeServices
 from src.database import DatabaseSession
@@ -90,20 +90,17 @@ async def delete_user_endpoint(
             )
         )]
 ) -> None:
-    return await auth_services.delete(id=model.id, database=database)
+    return await auth_services.delete(id_=model.id, database=database)
 
 
-@router.post("/tokens", response_model=TokenInfo)
-async def get_token_endpoint(
+@router.post("/login", response_model=LoginResponse)
+async def login(
         settings: SettingsDep,
         database: DatabaseSession,
-        user: OAuth2PasswordRequestForm = Depends()
-) -> TokenInfo:
-    return await auth_services.get_token(
-        data = TokenGet.model_validate({
-            "email": user.username,
-            "password": user.password,
-        }).model_dump(),
+        model: Login
+) -> LoginResponse:
+    return await auth_services.login(
+        data = model.model_dump(),
         jwt_settings=settings.jwt,
         database=database,
     )
@@ -126,7 +123,7 @@ async def get_scopes_endpoint(
         database: DatabaseSession,
         pagination: Pagination = Depends(),
 ) -> PaginationResponse[ScopeInfo]:
-    return await scope_services.list(
+    return await scope_services.paginate(
         database=database,
         filters={"role": role},
         pagination=pagination,

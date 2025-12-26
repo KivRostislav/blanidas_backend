@@ -10,7 +10,7 @@ from .config import get_settings
 class BaseDatabaseModel(DeclarativeBase):
     __abstract__ = True
 
-engine = create_async_engine(get_settings().database_url)
+engine = create_async_engine(get_settings().database_url, echo=True)
 session_factory = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
 @event.listens_for(engine.sync_engine, "connect")

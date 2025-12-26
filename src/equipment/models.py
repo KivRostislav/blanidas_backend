@@ -10,9 +10,9 @@ from src.manufacturer.models import ManufacturerInfo
 
 class EquipmentInfo(BaseModel):
     id: int
-    name: str
     serial_number: str
     installed: date
+    location: str
     institution: InstitutionInfo | None = None
     equipment_model: EquipmentModelInfo | None = None
     equipment_category: EquipmentCategoryInfo | None = None
@@ -31,7 +31,7 @@ class EquipmentFilters(BaseModel):
     manufacturer_id: int | None = None
 
 class EquipmentCreate(BaseModel):
-    name: str
+    location: str
     serial_number: str
     installed: date
     institution_id: int
@@ -45,7 +45,7 @@ class EquipmentCreate(BaseModel):
 
 class EquipmentUpdate(BaseModel):
     id: int
-    name: str | None = None
+    location: str | None = None
     serial_number: str | None = None
     institution_id: int | None = None
     installed: date | None = None

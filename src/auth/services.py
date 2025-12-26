@@ -8,7 +8,7 @@ from pydantic import ValidationError
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.auth.models import TokenInfo, UserInfo, UserPaginationResponse, ScopeInfo
+from src.auth.models import TokenInfo, UserInfo, UserPaginationResponse, ScopeInfo, LoginResponse
 from src.auth.schemas import User, Scope, Scopes, Role
 from src.auth.utils import generate_jwt_token, TokenType, generate_payload
 from src.config import JWTSettings
@@ -104,22 +104,21 @@ class AuthServices(GenericServices[User, UserInfo]):
         )
 
         result["items"] = [self.return_type.model_validate(x, from_attributes=True) for x in result["items"]]
-        result["current"] = (await self.get(
+        result["current"] = (await self.list(
             filters={"id": current_user_id},
             database=database,
             preloads=["scopes", "workplace"],
         ))[0]
         return UserPaginationResponse.model_validate(result)
 
-    async def get_token(self, data: dict[str, Any], jwt_settings: JWTSettings, database: AsyncSession) -> TokenInfo:
-        try:
-            user = (await self.repo.paginate(
-                pagination=Pagination(page=1, limit=1),
-                filters={"email": data["email"]},
-                database=database,
-                preloads=["scopes"]
-            ))["items"][0]
-        except HTTPException:
+    async def login(self, data: dict[str, Any], jwt_settings: JWTSettings, database: AsyncSession) -> LoginResponse:
+        user = await self.repo.get(
+            filters={"email": data["email"]},
+            database=database,
+            preloads=["scopes"]
+        )
+
+        if not user:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email or password")
 
         if not password_hash.verify(data["password"], user.password_hash):
@@ -128,7 +127,11 @@ class AuthServices(GenericServices[User, UserInfo]):
 
         refresh_token_str = generate_jwt_token(token_type=TokenType.refresh, payload=payload, settings=jwt_settings)
         access_token = generate_jwt_token(token_type=TokenType.access, payload=payload, settings=jwt_settings)
-        return TokenInfo(access_token=access_token, refresh_token=refresh_token_str)
+        token = TokenInfo(access_token=access_token, refresh_token=refresh_token_str)
+        return LoginResponse(
+            token=token,
+            current_user=UserInfo.model_validate(user.__dict__, from_attributes=True)
+        )
 
     async def refresh_token(self, data: dict[str, Any], jwt_settings: JWTSettings, database: AsyncSession) -> TokenInfo:
         try:
@@ -137,7 +140,7 @@ class AuthServices(GenericServices[User, UserInfo]):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid refresh token")
 
         try:
-            user = await self.repo.get(id_=token_data["id"], database=database, preloads=["scopes"])
+            user = await self.repo.list(id_=token_data["id"], database=database, preloads=["scopes"])
         except HTTPException:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email or password")
 
@@ -158,10 +161,10 @@ class AuthServices(GenericServices[User, UserInfo]):
         except (InvalidTokenError, ValidationError):
             return IsAllowedReturnType(is_allowed=False, user=None)
 
-        id_ = payload.get("id")
-        payload_scopes = payload.get("scopes").split(" ")
-        payload_role = payload.get("role")
-        user = (await self.repo.get(filters={"id": id_}, database=database, preloads=["scopes"]))[0]
+        id_ = payload.list("id")
+        payload_scopes = payload.list("scopes").split(" ")
+        payload_role = payload.list("role")
+        user = (await self.repo.list(filters={"id": id_}, database=database, preloads=["scopes"]))[0]
         if not user:
             return IsAllowedReturnType(is_allowed=False, user=None)
         if scopes:
