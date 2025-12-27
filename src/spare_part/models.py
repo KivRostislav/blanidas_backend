@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
 from enum import Enum
 
 from src.equipment_model.models import EquipmentModelInfo
@@ -29,13 +29,18 @@ class SparePartInfo(BaseModel):
     spare_part_category: SparePartCategoryInfo | None
     manufacturer: ManufacturerInfo | None
 
+    @computed_field
+    @property
+    def quantity(self) -> int:
+        return sum([location.quantity for location in self.locations])
+
 class SparePartState(str, Enum):
     InStock = "in_stock"
     LowStock = "low_stock"
     OutOfStock = "out_of_stock"
 
 class SparePartFilters(BaseModel):
-    name__like: str | None = None
+    name__ilike: str | None = None
     serial_number__like: str | None = None
 
     institution_type_id: int | None = None

@@ -46,6 +46,7 @@ class RepairRequestUsedSparePart(BaseDatabaseModel):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     quantity: Mapped[int] = mapped_column()
+    note: Mapped[str] = mapped_column()
 
     spare_part_id: Mapped[int | None] = mapped_column(ForeignKey("spare_part.id", ondelete="SET NULL"), nullable=True)
     spare_part: Mapped["SparePart"] = relationship(back_populates="repair_request_used_spare_parts", lazy="noload")
@@ -66,8 +67,8 @@ class RepairRequest(BaseDatabaseModel):
     created_at: Mapped[datetime] = mapped_column()
     completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
-    manager_note: Mapped[str | None] = mapped_column(nullable=True)
-    engineer_note: Mapped[str | None] = mapped_column(nullable=True)
+    manager_note: Mapped[str] = mapped_column()
+    engineer_note: Mapped[str] = mapped_column()
 
     used_spare_parts: Mapped[list["RepairRequestUsedSparePart"]] = relationship(
         back_populates="repair_request",

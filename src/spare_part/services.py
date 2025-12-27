@@ -1,8 +1,12 @@
+from statistics import quantiles
+from typing import Any
+
 from fastapi import BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.schemas import User
 from src.event import emit, EventTypes
+from src.pagination import PaginationResponse, Pagination
 from src.repository import CRUDRepository
 from src.services import GenericServices
 from src.mailer.smtp import MailerService
@@ -65,4 +69,5 @@ class SparePartServices(GenericServices[SparePart, SparePartInfo]):
                         spare_part_min_quantity=spare_part.min_quantity,
                     )
                 )
-        return spare_part
+
+        return SparePartInfo.model_validate({quantity: quantity, **spare_part.__dict__}, from_attributes=True)

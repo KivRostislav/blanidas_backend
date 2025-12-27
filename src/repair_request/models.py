@@ -31,11 +31,13 @@ class FileInfo(BaseModel):
 
 class CreateRepairRequestUsedSpareParts(BaseModel):
     quantity: int
+    note: str
     spare_part_id: int
     institution_id: int
 
 class RepairRequestUsedSparePartsInfo(BaseModel):
     quantity: int
+    note: str
     spare_part: SparePartInfo | None
     institution: InstitutionInfo | None
 

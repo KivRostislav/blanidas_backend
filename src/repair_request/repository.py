@@ -30,11 +30,7 @@ class RepairRequestRepository(CRUDRepository[RepairRequest]):
             preloads: list[str] | None = None,
             validate_photos_callback: Callable[[], list[str]] | None = None,
     ) -> RepairRequest:
-        data_model = RepairRequestCreate.model_validate(data)
-
-        stmt = select(Equipment).where(Equipment.id == data_model.equipment_id)
-        equipment_obj = (await database.execute(stmt)).scalars().first()
-        if not equipment_obj:
+        if not validate_relationships(RepairRequest, data, database, ["equipment"]):
             raise ForeignKeyNotFoundError()
 
         data["created_at"] = datetime.now()
@@ -95,6 +91,9 @@ class RepairRequestRepository(CRUDRepository[RepairRequest]):
         if not await validate_relationships(self.model, data, database, ["failure_types"]):
             raise ForeignKeyNotFoundError()
 
+        for field, value in data_model.model_dump(exclude={"state_history", "used_spare_parts"}, exclude_unset=True).items():
+            setattr(obj, field, value)
+
         if data_model.failure_types_ids is not None:
             failure_types = (await database.execute(
                 select(FailureType).where(FailureType.id.in_(data_model.failure_types_ids))
@@ -113,10 +112,14 @@ class RepairRequestRepository(CRUDRepository[RepairRequest]):
                     raise ForeignKeyNotFoundError()
             state_history_obj = RepairRequestState(
                 repair_request_id=obj.id,
-                responsible_user=responsible_user_id,
+                created_at=datetime.now(),
+                responsible_user_id=responsible_user_id,
                 status=data_model.state_history.status,
             )
             database.add(state_history_obj)
+
+            if data_model.state_history.status == RepairRequestStatus.finished:
+                obj.completed_at = datetime.now()
 
         if data_model.used_spare_parts is not None:
             old_parts = {(usp.spare_part_id, usp.institution_id): usp for usp in obj.used_spare_parts}
@@ -185,6 +188,7 @@ class RepairRequestRepository(CRUDRepository[RepairRequest]):
                     spare_part_id=usp.spare_part_id,
                     institution_id=usp.institution_id,
                     quantity=usp.quantity,
+                    note=usp.note,
                 )
                 database.add(used_part)
 
