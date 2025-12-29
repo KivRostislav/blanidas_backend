@@ -13,7 +13,7 @@ class RepairRequestCreatedMessagePayload(BaseModel):
     receiver_username: str
 
     equipment_name: str
-    repair_request_description: str
-    repair_request_urgency_level: str
+    repair_request_issue: str
+    repair_request_urgency: str
 
     repair_request_photos: list[str]

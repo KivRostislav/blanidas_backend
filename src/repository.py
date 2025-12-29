@@ -3,12 +3,12 @@ from collections.abc import Callable
 from typing import Generic, TypeVar, Type, Any
 
 from fastapi import HTTPException, status
-from fastapi.logger import logger
 from sqlalchemy import select, func, Select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sorting import Sorting, SortOrder
 from src.exceptions import UniqueConstraintError, ForeignKeyNotFoundError, NotFoundError
-from src.filter import apply_filters
+from src.filter import apply_filters, sorting_apply
 from src.pagination import Pagination
 from src.utils import build_relation, validate_uniqueness, validate_relationships
 
@@ -16,11 +16,18 @@ from math import ceil
 
 ModelType = TypeVar("ModelType")
 FilterCallback = Callable[[Select[Any], Type[ModelType], dict[str, Any]], Select[Any]]
+SortingCallback = Callable[[Select[Any], Type[ModelType], str, bool], Select[Any]]
 
 class CRUDRepository(Generic[ModelType]):
-    def __init__(self, model: Type[ModelType], filter_callback: FilterCallback = apply_filters):
+    def __init__(
+            self,
+            model: Type[ModelType],
+            filter_callback: FilterCallback = apply_filters,
+            sorting_callback: SortingCallback = sorting_apply,
+    ):
         self.model = model
         self.filter_callback = filter_callback
+        self.sorting_callback = sorting_callback
 
     async def paginate(
             self,
@@ -28,12 +35,16 @@ class CRUDRepository(Generic[ModelType]):
             pagination: Pagination,
             filters: dict | None = None,
             preloads: list[str] | None = None,
+            sorting: Sorting | None = None,
     ) -> dict:
         preloads = preloads if preloads else []
         filters = filters if filters else {}
 
         stmt = select(self.model)
         stmt = self.filter_callback(stmt, self.model, filters)
+
+        if sorting:
+            stmt = self.sorting_callback(stmt, self.model, sorting.order_by, sorting.order == SortOrder.descending)
 
         if preloads:
             options = build_relation(self.model, preloads)
@@ -44,6 +55,7 @@ class CRUDRepository(Generic[ModelType]):
             count_stmt = self.filter_callback(count_stmt, self.model, filters)
 
         total = (await database.execute(count_stmt)).scalar() or 0
+
         if pagination.limit >= 0:
             stmt = stmt.offset(pagination.offset).limit(pagination.limit)
 

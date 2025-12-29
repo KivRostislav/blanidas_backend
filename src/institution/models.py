@@ -1,3 +1,5 @@
+from enum import Enum
+
 from pydantic import EmailStr, BaseModel
 from pydantic_extra_types.phone_numbers import PhoneNumber
 
@@ -16,6 +18,11 @@ class InstitutionFilters(BaseModel):
     name__like: str | None = None
     address__like: str | None = None
     institution_type_id: int | None = None
+
+class InstitutionOrderBy(str, Enum):
+    equipment_country = "equipment_country"
+    institution_type__name = "institution_type__name"
+    name = "name"
 
 class InstitutionCreate(BaseModel):
     name: str

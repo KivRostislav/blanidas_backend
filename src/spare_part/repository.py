@@ -5,11 +5,9 @@ from sqlalchemy.orm import joinedload
 
 from src.equipment_model.schemas import EquipmentModel
 from src.exceptions import NotFoundError
-from src.repair_request.models import CreateRepairRequestUsedSpareParts
 from src.repository import CRUDRepository
 from src.spare_part.models import SparePartCreate, SparePartUpdate
 from src.spare_part.schemas import SparePart, SparePartLocationQuantity
-from src.spare_part_category.schemas import SparePartCategory
 from src.utils import validate_relationships, build_relation
 
 
@@ -94,13 +92,14 @@ class SparePartRepository(CRUDRepository[SparePart]):
         for field, value in data_model.model_dump(exclude={"locations", "compatible_models_ids"}, exclude_unset=True).items():
             setattr(spare_part_obj, field, value)
 
-        stmt = select(EquipmentModel).where(EquipmentModel.id.in_(data_model.compatible_models_ids))
-        compatible_model_objs = (await database.execute(stmt)).scalars().all()
-        spare_part_obj.compatible_models.clear()
-        await database.flush()
+        if data_model.compatible_models_ids is not None:
+            stmt = select(EquipmentModel).where(EquipmentModel.id.in_(data_model.compatible_models_ids))
+            compatible_model_objs = (await database.execute(stmt)).scalars().all()
+            spare_part_obj.compatible_models.clear()
+            await database.flush()
 
-        for compatible_model_obj in compatible_model_objs:
-            spare_part_obj.compatible_models.append(compatible_model_obj)
+            for compatible_model_obj in compatible_model_objs:
+                spare_part_obj.compatible_models.append(compatible_model_obj)
 
         incoming_ids = {
             loc.institution_id

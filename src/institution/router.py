@@ -1,7 +1,9 @@
 from fastapi import APIRouter
-from fastapi.params import Depends
+from fastapi.params import Depends, Query
 
-from src.institution.models import InstitutionInfo, InstitutionFilters, InstitutionCreate, InstitutionUpdate
+from sorting import Sorting, SortOrder
+from src.institution.models import InstitutionInfo, InstitutionFilters, InstitutionCreate, InstitutionUpdate, \
+    InstitutionOrderBy
 from src.institution.services import InstitutionServices
 from src.pagination import PaginationResponse, Pagination
 from src.database import DatabaseSession
@@ -15,10 +17,13 @@ async def get_institution_list_endpoint(
         database: DatabaseSession,
         pagination: Pagination = Depends(),
         filters: InstitutionFilters = Depends(),
+        sort_by: InstitutionOrderBy | None = Query(None),
+        sort_order: SortOrder = Query(SortOrder.ascending),
 ) -> PaginationResponse[InstitutionInfo]:
     return await services.paginate(
         database=database,
         pagination=pagination,
+        sorting=Sorting(order=sort_order, order_by=sort_by) if sort_by else None,
         filters=filters.model_dump(exclude_none=True),
         preloads=["institution_type"],
     )

@@ -2,6 +2,7 @@ from typing import Generic, TypeVar, Type, Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sorting import Sorting
 from src.equipment.models import EquipmentInfo
 from src.exceptions import NotFoundError
 from src.pagination import PaginationResponse, Pagination
@@ -89,12 +90,14 @@ class GenericServices(Generic[ModelType, InfoType]):
             pagination: Pagination,
             filters: dict[str, Any] | Any = None,
             preloads: list[str] | None = None,
+            sorting: Sorting | None = None,
     ) -> PaginationResponse[InfoType]:
         result = await self.repo.paginate(
             database=database,
             pagination=pagination,
             filters=filters,
-            preloads=preloads
+            preloads=preloads,
+            sorting=sorting,
         )
         result["items"] = [self.return_type.model_validate(x.__dict__, from_attributes=True) for x in result["items"]]
         return PaginationResponse.model_validate(result)

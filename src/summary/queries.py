@@ -4,7 +4,7 @@ from sqlalchemy.orm import aliased
 from src.auth.schemas import User, Role
 from src.equipment.schemas import Equipment
 from src.institution.schemas import Institution
-from src.repair_request.schemas import RepairRequestStatus, RepairRequestState, RepairRequest
+from src.repair_request.schemas import RepairRequestStatus, RepairRequestStatusRecord, RepairRequest
 from src.spare_part.schemas import SparePart, SparePartLocationQuantity
 from src.summary.models import UserSummary, InstitutionSummary, EquipmentSummary, SparePartSummary, RepairRequestSummary
 
@@ -24,7 +24,7 @@ institution_rules = {
 
 
 rr = aliased(RepairRequest)
-rrs = aliased(RepairRequestState)
+rrs = aliased(RepairRequestStatusRecord)
 row_number = func.row_number().over(
     partition_by=Equipment.id,
     order_by=rrs.created_at.desc()
@@ -97,37 +97,23 @@ spare_part_rules = {
 
 acs_row_number_col = func.row_number().over(
     partition_by=RepairRequest.id,
-    order_by=RepairRequestState.created_at.asc()
+    order_by=RepairRequestStatusRecord.created_at.asc()
 ).label("row_num")
-
-acs_ranked_subquery = (
-    select(
-        RepairRequest,
-        RepairRequestState,
-        acs_row_number_col
-    )
-    .join(
-        RepairRequestState,
-        RepairRequest.id == RepairRequestState.repair_request_id,
-        isouter=True
-    )
-    .cte("ranked_requests_asc")
-)
 
 desc_row_number_col = func.row_number().over(
     partition_by=RepairRequest.id,
-    order_by=RepairRequestState.created_at.desc()
+    order_by=RepairRequestStatusRecord.created_at.desc()
 ).label("row_num")
 
 desc_ranked_subquery = (
     select(
         RepairRequest,
-        RepairRequestState,
+        RepairRequestStatusRecord,
         desc_row_number_col
     )
     .join(
-        RepairRequestState,
-        RepairRequest.id == RepairRequestState.repair_request_id,
+        RepairRequestStatusRecord,
+        RepairRequest.id == RepairRequestStatusRecord.repair_request_id,
         isouter=True
     )
     .cte("ranked_requests_desc")
@@ -136,8 +122,13 @@ desc_ranked_subquery = (
 repair_part_rules = {
     "new": lambda db: db.scalar(
         select(func.count())
-        .select_from(acs_ranked_subquery)
-        .where(acs_ranked_subquery.c.row_num == 1)
+        .select_from(desc_ranked_subquery)
+        .where(
+            and_(
+                desc_ranked_subquery.c.row_num == 1,
+                desc_ranked_subquery.c.status == RepairRequestStatus.not_taken.value
+            )
+        )
     ),
     "in_progress": lambda db: db.scalar(
         select(func.count())
@@ -173,7 +164,7 @@ repair_part_rules = {
 
 
 SUMMARY_RULES = {
-    "repair-request": {
+    "repair-requests": {
         "response_model": RepairRequestSummary,
         "rules": repair_part_rules,
     },

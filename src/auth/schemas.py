@@ -9,6 +9,7 @@ from enum import Enum
 
 from src.database import BaseDatabaseModel
 from src.institution.schemas import Institution
+from src.repair_request.schemas import RepairRequestStatusRecord
 
 
 def merge_enums(name: str, *enums: type[Enum]):
@@ -69,5 +70,5 @@ class User(BaseDatabaseModel):
     receive_low_stock_notification: Mapped[bool] = mapped_column()
     receive_repair_request_created_notification: Mapped[bool] = mapped_column()
 
-    repair_request_states: Mapped[list["RepairRequestState"]] = relationship(back_populates="responsible_user", lazy="noload")
+    status_history: Mapped[list["RepairRequestStatusRecord"]] = relationship(back_populates="assigned_engineer", lazy="noload")
 

@@ -1,16 +1,17 @@
-from fastapi import APIRouter, UploadFile, BackgroundTasks
+from fastapi import APIRouter, UploadFile, BackgroundTasks, Query
 from fastapi.params import Depends, Form, File
 
+from sorting import SortOrder, Sorting
 from src.mailer.dependencies import MailerServiceDep
 from src.pagination import PaginationResponse, Pagination
-from src.repair_request.models import RepairRequestInfo, RepairRequestFilters, RepairRequestCreate, RepairRequestUpdate
+from src.repair_request.models import RepairRequestInfo, RepairRequestFilters, RepairRequestCreate, RepairRequestUpdate, RepairRequestSortBy
 from src.database import DatabaseSession
-from src.repair_request.schemas import UrgencyLevel
+from src.repair_request.schemas import Urgency
 from src.repair_request.services import RepairRequestServices
 
 from src.config import get_settings
 
-router = APIRouter(prefix="/repair-request", tags=["Repair request"])
+router = APIRouter(prefix="/repair-requests", tags=["Repair requests"])
 
 settings = get_settings()
 services = RepairRequestServices(
@@ -23,10 +24,13 @@ async def get_repair_request_list_endpoint(
         database: DatabaseSession,
         pagination: Pagination = Depends(),
         filters: RepairRequestFilters = Depends(),
+        sort_by: RepairRequestSortBy | None = Query(None),
+        sort_order: SortOrder = Query(SortOrder.ascending),
 ) -> PaginationResponse[RepairRequestInfo]:
     return await services.paginate(
         database=database,
         pagination=pagination,
+        sorting=Sorting(order=sort_order, order_by=sort_by) if sort_by else None,
         filters=filters.model_dump(exclude_none=True),
         preloads=[
             "equipment",
@@ -38,9 +42,9 @@ async def get_repair_request_list_endpoint(
             "used_spare_parts.institution",
             "used_spare_parts.spare_part",
             "photos",
-            "state_history",
-            "state_history.responsible_user",
-        ]
+            "status_history",
+            "status_history.assigned_engineer",
+        ],
     )
 
 @router.get("/{id_}", response_model=RepairRequestInfo)
@@ -58,8 +62,8 @@ async def get_repair_request_endpoint(id_: int, database: DatabaseSession) -> Re
             "used_spare_parts.institution",
             "used_spare_parts.spare_part",
             "photos",
-            "state_history",
-            "state_history.responsible_user",
+            "status_history",
+            "status_history.assigned_engineer",
         ]
     )
 
@@ -68,16 +72,16 @@ async def create_repair_request_endpoint(
         database: DatabaseSession,
         background_tasks: BackgroundTasks,
         mailer: MailerServiceDep,
-        description: str = Form(...),
-        urgency_level: UrgencyLevel = Form(...),
+        issue: str = Form(...),
+        urgency: Urgency = Form(...),
         equipment_id: int = Form(...),
         photos: list[UploadFile] | None = File(None),
 ) -> RepairRequestInfo:
     photos = photos or []
 
     model = RepairRequestCreate(
-        description=description,
-        urgency_level=urgency_level,
+        issue=issue,
+        urgency=urgency,
         equipment_id=equipment_id,
     )
 
@@ -93,8 +97,8 @@ async def create_repair_request_endpoint(
             "failure_types",
             "used_spare_parts",
             "photos",
-            "state_history",
-            "state_history.responsible_user",
+            "status_history",
+            "status_history.assigned_engineer",
         ]
     )
 
@@ -111,7 +115,7 @@ async def update_repair_request_endpoint(
         relationship_fields=[
             "failure_types",
             "used_spare_parts",
-            "state_history",
+            "status_history",
         ],
         overwrite_relationships=["failure_types", "used_spare_parts"],
         preloads=[
@@ -120,8 +124,8 @@ async def update_repair_request_endpoint(
             "used_spare_parts.institution",
             "used_spare_parts.spare_part",
             "photos",
-            "state_history",
-            "state_history.responsible_user",
+            "status_history",
+            "status_history.assigned_engineer",
             "equipment",
             "equipment.institution",
         ]
@@ -139,7 +143,7 @@ async def delete_repair_request_endpoint(
         relationship_fields=[
             "failure_types",
             "used_spare_parts",
-            "state_history",
+            "status_history",
         ],
         background_tasks=background_tasks,
     )

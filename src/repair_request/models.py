@@ -1,26 +1,40 @@
 from datetime import datetime
+from enum import Enum
 
-from pydantic import BaseModel, validator, field_validator
+from pydantic import BaseModel
 
 from src.auth.models import UserInfo
 from src.equipment.models import EquipmentInfo
 from src.failure_type.models import FailureTypeInfo
 from src.institution.models import InstitutionInfo
-from src.repair_request.schemas import UrgencyLevel, RepairRequestStatus
+from src.repair_request.schemas import Urgency, RepairRequestStatus
 from src.spare_part.models import SparePartInfo
 
-class RepairRequestStateInfo(BaseModel):
+
+class RepairRequestFilters(BaseModel):
+    id__ne: int | None = None
+    equipment_id__eq: int | None = None
+    equipment__serial_number__or__equipment__equipment_model__name__ilike: str | None = None
+    equipment__equipment_category_id__eq: int | None = None
+    equipment__institution_id__eq: int | None = None
+    urgency__eq: Urgency | None = None
+    status__eq: RepairRequestStatus | None = None
+
+class RepairRequestSortBy(str, Enum):
+    urgency = "urgency"
+    created_at = "created_at"
+    equipment__equipment_model__name = "equipment__equipment_model__name"
+    status = "status"
+
+class RepairRequestStatusRecordInfo(BaseModel):
     id: int
     created_at: datetime
     status: RepairRequestStatus
-    responsible_user: UserInfo | None
+    assigned_engineer: UserInfo | None
 
-class RepairRequestStateCreate(BaseModel):
+class RepairRequestStatusRecordCreate(BaseModel):
     status: RepairRequestStatus
-    responsible_user_id: int | None
-
-class RepairRequestFilters(BaseModel):
-    pass
+    assigned_engineer_id: int | None
 
 class FileCreate(BaseModel):
     file_path: str
@@ -29,13 +43,13 @@ class FileCreate(BaseModel):
 class FileInfo(BaseModel):
     file_path: str
 
-class CreateRepairRequestUsedSpareParts(BaseModel):
+class UsedSparePartCreate(BaseModel):
     quantity: int
     note: str
     spare_part_id: int
     institution_id: int
 
-class RepairRequestUsedSparePartsInfo(BaseModel):
+class UsedSparePartInfo(BaseModel):
     quantity: int
     note: str
     spare_part: SparePartInfo | None
@@ -43,8 +57,8 @@ class RepairRequestUsedSparePartsInfo(BaseModel):
 
 class RepairRequestInfo(BaseModel):
     id: int
-    description: str
-    urgency_level: UrgencyLevel
+    issue: str
+    urgency: Urgency
     manager_note: str | None
     engineer_note: str | None
     created_at: datetime
@@ -52,13 +66,13 @@ class RepairRequestInfo(BaseModel):
 
     photos: list[FileInfo]
     failure_types: list[FailureTypeInfo]
-    used_spare_parts: list[RepairRequestUsedSparePartsInfo]
-    state_history: list[RepairRequestStateInfo]
+    used_spare_parts: list[UsedSparePartInfo]
+    status_history: list[RepairRequestStatusRecordInfo]
     equipment: EquipmentInfo | None
 
 class RepairRequestCreate(BaseModel):
-    description: str
-    urgency_level: UrgencyLevel
+    issue: str
+    urgency: Urgency
     equipment_id: int
 
 class RepairRequestUpdate(BaseModel):
@@ -67,5 +81,5 @@ class RepairRequestUpdate(BaseModel):
     engineer_note: str | None = None
 
     failure_types_ids: list[int] | None = None
-    used_spare_parts: list[CreateRepairRequestUsedSpareParts] | None = None
-    state_history: RepairRequestStateCreate | None = None
+    used_spare_parts: list[UsedSparePartCreate] | None = None
+    status_history: RepairRequestStatusRecordCreate | None = None

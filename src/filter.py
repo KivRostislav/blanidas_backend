@@ -1,5 +1,5 @@
 from typing import TypeVar
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import InstrumentedAttribute
 
 from src.database import BaseDatabaseModel
@@ -19,8 +19,6 @@ OPERATORS = {
 }
 
 ModelType = TypeVar("ModelType", bound=BaseDatabaseModel)
-
-
 def apply_filters(stmt, model: ModelType, filters: dict):
     conditions = []
     joins = {}
@@ -65,3 +63,32 @@ def apply_filters(stmt, model: ModelType, filters: dict):
         stmt = stmt.where(and_(*conditions))
 
     return stmt
+
+def sorting_apply(stmt, model: ModelType, order_by: str, desc: bool):
+    parts = order_by.split("__")
+    current_model = model
+    attr = None
+    joins = {}
+
+    for part in parts:
+        if not hasattr(current_model, part):
+            attr = None
+            break
+
+        attr = getattr(current_model, part)
+
+        if isinstance(attr, InstrumentedAttribute) and hasattr(attr.property, "mapper"):
+            if attr not in joins:
+                stmt = stmt.join(attr)
+                joins[attr] = True
+            current_model = attr.property.mapper.class_
+        else:
+            current_model = None
+
+    if not attr:
+        return stmt
+
+    if desc:
+        attr = attr.desc()
+
+    return stmt.order_by(attr)

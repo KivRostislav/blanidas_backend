@@ -8,14 +8,15 @@ import magic
 from fastapi import UploadFile, HTTPException, status, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sorting import Sorting
 from src.auth.schemas import User
 from src.event import emit, EventTypes
 from src.mailer.smtp import MailerService
 from src.mailer.models import RepairRequestCreatedMessagePayload
 from src.pagination import Pagination, PaginationResponse
-from src.repair_request.models import RepairRequestInfo, FileCreate, FileInfo, RepairRequestStateCreate
+from src.repair_request.models import RepairRequestInfo
 from src.repair_request.repository import RepairRequestRepository
-from src.repair_request.schemas import RepairRequest, RepairRequestState, File, RepairRequestStatus
+from src.repair_request.schemas import RepairRequest, File
 from src.repository import CRUDRepository
 from src.services import GenericServices
 
@@ -34,6 +35,28 @@ class RepairRequestServices(GenericServices[RepairRequest, RepairRequestInfo]):
 
         self.static_files_dir = static_files_dir
         self.proxy_url_to_static_files_dir = proxy_url_to_static_files_dir
+
+    async def paginate(
+            self,
+            database: AsyncSession,
+            pagination: Pagination,
+            filters: dict[str, Any] | Any = None,
+            sorting: Sorting | None = None,
+            preloads: list[str] | None = None,
+    ) -> PaginationResponse[RepairRequestInfo]:
+        result = await self.repo.paginate(
+            database=database,
+            pagination=pagination,
+            filters=filters,
+            sorting=sorting,
+            preloads=preloads,
+        )
+        result["items"] = [self.return_type.model_validate(x.__dict__, from_attributes=True) for x in result["items"]]
+        for item in result["items"]:
+            for photo in item.photos:
+                photo.file_path = form_url_to_file(self.proxy_url_to_static_files_dir, photo.file_path)
+
+        return PaginationResponse.model_validate(result)
 
     async def create(
             self,
@@ -107,8 +130,8 @@ class RepairRequestServices(GenericServices[RepairRequest, RepairRequestInfo]):
                     mailer=mailer,
                     payload=RepairRequestCreatedMessagePayload(
                         receiver_username=receiver.username,
-                        repair_request_description=repair_request.description,
-                        repair_request_urgency_level=repair_request.urgency_level.value,
+                        repair_request_issue=repair_request.issue,
+                        repair_request_urgency=repair_request.urgency.value,
                         repair_request_photos=[photo.file_path for photo in repair_request.photos],
                         equipment_name=repair_request.equipment.equipment_model.name,
                     )
@@ -141,6 +164,7 @@ class RepairRequestServices(GenericServices[RepairRequest, RepairRequestInfo]):
             photo.file_path = form_url_to_file(self.proxy_url_to_static_files_dir, str(photo.file_path))
         return RepairRequestInfo.model_validate(repair_request, from_attributes=True)
 
+
     async def delete(
             self,
             id_: int,
@@ -156,27 +180,6 @@ class RepairRequestServices(GenericServices[RepairRequest, RepairRequestInfo]):
                 continue
             os.remove(path)
         await self.repo.delete(id_=id_, database=database, relationship_fields=relationship_fields)
-
-
-    async def paginate(
-            self,
-            database: AsyncSession,
-            pagination: Pagination,
-            filters: dict[str, Any] | Any = None,
-            preloads: list[str] | None = None,
-    ) -> PaginationResponse[RepairRequestInfo]:
-        result = await self.repo.paginate(
-            database=database,
-            pagination=pagination,
-            filters=filters,
-            preloads=preloads
-        )
-        result["items"] = [self.return_type.model_validate(x.__dict__, from_attributes=True) for x in result["items"]]
-        for item in result["items"]:
-            for photo in item.photos:
-                photo.file_path = form_url_to_file(self.proxy_url_to_static_files_dir, photo.file_path)
-
-        return PaginationResponse.model_validate(result)
 
     async def get(
             self,

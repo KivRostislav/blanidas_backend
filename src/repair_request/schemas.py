@@ -15,22 +15,22 @@ class RepairRequestStatus(str, Enum):
     waiting_spare_parts = "waiting_spare_parts"
     finished = "finished"
 
-class UrgencyLevel(str, Enum):
+class Urgency(str, Enum):
     critical = "critical"
     non_critical = "non_critical"
 
-class RepairRequestState(BaseDatabaseModel):
-    __tablename__ = "repair_request_state"
+class RepairRequestStatusRecord(BaseDatabaseModel):
+    __tablename__ = "repair_request_status_record"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     created_at: Mapped[datetime] = mapped_column()
     status: Mapped[RepairRequestStatus] = mapped_column()
 
-    responsible_user_id: Mapped[int | None] = mapped_column(ForeignKey("user.id", ondelete="SET NULL"), nullable=True)
-    responsible_user: Mapped["User"] = relationship(back_populates="repair_request_states", lazy="noload")
+    assigned_engineer_id: Mapped[int | None] = mapped_column(ForeignKey("user.id", ondelete="SET NULL"), nullable=True)
+    assigned_engineer: Mapped["User"] = relationship(back_populates="status_history", lazy="noload")
 
     repair_request_id: Mapped[int] = mapped_column(ForeignKey("repair_request.id", ondelete="CASCADE"))
-    repair_request: Mapped["RepairRequest"] = relationship(back_populates="state_history", lazy="noload")
+    repair_request: Mapped["RepairRequest"] = relationship(back_populates="status_history", lazy="noload")
 
 class File(BaseDatabaseModel):
     __tablename__ = "file"
@@ -41,18 +41,18 @@ class File(BaseDatabaseModel):
     repair_request_id: Mapped[int] = mapped_column(ForeignKey("repair_request.id", ondelete="CASCADE"))
     repair_request: Mapped["RepairRequest"] = relationship(back_populates="photos", lazy="noload")
 
-class RepairRequestUsedSparePart(BaseDatabaseModel):
-    __tablename__ = "repair_request_used_spare_part"
+class UsedSparePart(BaseDatabaseModel):
+    __tablename__ = "used_spare_part"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     quantity: Mapped[int] = mapped_column()
     note: Mapped[str] = mapped_column()
 
     spare_part_id: Mapped[int | None] = mapped_column(ForeignKey("spare_part.id", ondelete="SET NULL"), nullable=True)
-    spare_part: Mapped["SparePart"] = relationship(back_populates="repair_request_used_spare_parts", lazy="noload")
+    spare_part: Mapped["SparePart"] = relationship(back_populates="used_spare_parts", lazy="noload")
 
     institution_id: Mapped[int | None] = mapped_column(ForeignKey("institution.id", ondelete="SET NULL"), nullable=True)
-    institution: Mapped["Institution"] = relationship(back_populates="repair_request_used_spare_parts", lazy="noload")
+    institution: Mapped["Institution"] = relationship(back_populates="used_spare_parts", lazy="noload")
 
     repair_request_id: Mapped[int] = mapped_column(ForeignKey("repair_request.id", ondelete="CASCADE"))
     repair_request: Mapped["RepairRequest"] = relationship(back_populates="used_spare_parts", lazy="noload")
@@ -62,15 +62,15 @@ class RepairRequest(BaseDatabaseModel):
     __tablename__ = "repair_request"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    description: Mapped[str] = mapped_column()
-    urgency_level: Mapped[UrgencyLevel] = mapped_column()
+    issue: Mapped[str] = mapped_column()
+    urgency: Mapped[Urgency] = mapped_column()
     created_at: Mapped[datetime] = mapped_column()
     completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
     manager_note: Mapped[str] = mapped_column()
     engineer_note: Mapped[str] = mapped_column()
 
-    used_spare_parts: Mapped[list["RepairRequestUsedSparePart"]] = relationship(
+    used_spare_parts: Mapped[list["UsedSparePart"]] = relationship(
         back_populates="repair_request",
         cascade="all, delete-orphan",
         lazy="noload"
@@ -87,9 +87,10 @@ class RepairRequest(BaseDatabaseModel):
         cascade="all, delete-orphan",
         lazy="noload"
     )
-    state_history: Mapped[list["RepairRequestState"]] = relationship(
+    status_history: Mapped[list["RepairRequestStatusRecord"]] = relationship(
         back_populates="repair_request",
         cascade="all, delete-orphan",
+        order_by="desc(RepairRequestStatusRecord.created_at)",
         lazy="noload"
     )
 
