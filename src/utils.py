@@ -2,7 +2,8 @@ from typing import Type, Any
 
 from sqlalchemy import Sequence, or_, select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
+
 
 def build_relation(model_type: Type, preload: Sequence[str]) -> list[Any]:
     options = []
@@ -11,14 +12,14 @@ def build_relation(model_type: Type, preload: Sequence[str]) -> list[Any]:
         parts = rel.split(".")
 
         attr = getattr(model_type, parts[0])
-        loader = joinedload(attr)
+        loader = selectinload(attr)
 
         current_loader = loader
         current_model = attr.property.mapper.class_
 
         for part in parts[1:]:
             sub_attr = getattr(current_model, part)
-            current_loader = current_loader.joinedload(sub_attr)
+            current_loader = current_loader.selectinload(sub_attr)
             current_model = sub_attr.property.mapper.class_
 
         options.append(current_loader)

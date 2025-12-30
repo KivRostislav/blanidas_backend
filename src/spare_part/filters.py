@@ -1,4 +1,4 @@
-from sqlalchemy import func
+from sqlalchemy import func, select
 from sqlalchemy.orm import aliased
 
 from src.filter import apply_filters, ModelType
@@ -9,15 +9,24 @@ def spare_part_filter(stmt, model: ModelType, filters: dict):
     stmt = apply_filters(stmt, model, filters)
     if "stock_state" in filters:
         loc = aliased(model.locations.property.mapper.class_)
-        total_quantity = func.coalesce(func.sum(loc.quantity), 0)
+        qty_subq = (
+            select(
+                loc.spare_part_id.label("spare_part_id"),
+                func.coalesce(func.sum(loc.quantity), 0).label("total_quantity"),
+            )
+            .group_by(loc.spare_part_id)
+            .subquery()
+        )
 
-        stmt = stmt.join(loc, model.locations, isouter=True).group_by(model.id)
+        stmt = stmt.outerjoin(qty_subq, qty_subq.c.spare_part_id == model.id)
+        total_qty_col = func.coalesce(qty_subq.c.total_quantity, 0)
 
-        if filters["stock_state"] == SparePartState.InStock.value:
-            stmt = stmt.having(total_quantity > model.min_quantity)
-        elif filters["stock_state"] == SparePartState.OutOfStock.value:
-            stmt = stmt.having(total_quantity == 0)
-        elif filters["stock_state"] == SparePartState.LowStock.value:
-            stmt = stmt.having(total_quantity <= model.min_quantity)
+        state = filters["stock_state"]
+        if state == SparePartState.InStock.value:
+            stmt = stmt.where(total_qty_col > model.min_quantity)
+        elif state == SparePartState.OutOfStock.value:
+            stmt = stmt.where(total_qty_col == 0)
+        elif state == SparePartState.LowStock.value:
+            stmt = stmt.where(total_qty_col <= model.min_quantity)
 
     return stmt

@@ -1,12 +1,13 @@
 from fastapi import APIRouter, BackgroundTasks
-from fastapi.params import Depends
+from fastapi.params import Depends, Query
 
+from sorting import SortOrder, Sorting
 from src.database import DatabaseSession
 from src.pagination import Pagination
 from src.pagination import PaginationResponse
 from src.mailer.dependencies import MailerServiceDep
 from src.spare_part.filters import spare_part_filter
-from src.spare_part.models import SparePartInfo, SparePartFilters, SparePartCreate, SparePartUpdate
+from src.spare_part.models import SparePartInfo, SparePartFilters, SparePartCreate, SparePartUpdate, SparePartsSortBy
 from src.spare_part.services import SparePartServices
 
 router = APIRouter(prefix="/spare-parts", tags=["Spare Parts"])
@@ -17,10 +18,13 @@ async def get_spare_part_list_endpoint(
         database: DatabaseSession,
         pagination: Pagination = Depends(),
         filters: SparePartFilters = Depends(),
+        sort_by: SparePartsSortBy | None = Query(None),
+        sort_order: SortOrder = Query(SortOrder.ascending),
 ) -> PaginationResponse[SparePartInfo]:
     return await services.paginate(
         database=database,
         pagination=pagination,
+        sorting=Sorting(order=sort_order, order_by=sort_by) if sort_by else None,
         filters=filters.model_dump(exclude_none=True),
         preloads=[
             "supplier",

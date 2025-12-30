@@ -41,12 +41,15 @@ class SparePartState(str, Enum):
 
 class SparePartFilters(BaseModel):
     name__ilike: str | None = None
-    serial_number__like: str | None = None
-
     institution_type_id: int | None = None
     spare_part_category_id: int | None = None
 
     stock_state: SparePartState | None = None
+
+class SparePartsSortBy(str, Enum):
+    name = "name"
+    quantity = "quantity"
+    status = "status"
 
 
 class SparePartCreate(BaseModel):

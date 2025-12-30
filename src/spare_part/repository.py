@@ -1,19 +1,80 @@
-from sqlalchemy import select
+from math import ceil
+
+from sqlalchemy import select, inspect, func
 from sqlalchemy.exc import NoForeignKeysError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload, contains_eager
 
+from sorting import Sorting, SortOrder
 from src.equipment_model.schemas import EquipmentModel
 from src.exceptions import NotFoundError
+from src.institution.schemas import Institution
+from src.pagination import Pagination
 from src.repository import CRUDRepository
 from src.spare_part.models import SparePartCreate, SparePartUpdate
 from src.spare_part.schemas import SparePart, SparePartLocationQuantity
+from src.spare_part.sorting import apply_spare_parts_sorting
 from src.utils import validate_relationships, build_relation
 
 
 class SparePartRepository(CRUDRepository[SparePart]):
     def __init__(self):
-        super().__init__(SparePart)
+        super().__init__(SparePart, sorting_callback=apply_spare_parts_sorting)
+
+    async def paginate(
+            self,
+            database: AsyncSession,
+            pagination: Pagination,
+            filters: dict | None = None,
+            preloads: list[str] | None = None,
+            sorting: Sorting | None = None,
+    ) -> dict:
+        preloads_mapper = inspect(SparePart).relationships.items()
+        preloads_mapper.remove(list(filter(lambda x: x[0] == "locations", preloads_mapper))[0])
+        filters = filters if filters else {}
+
+        stmt = select(self.model)
+        stmt = self.filter_callback(stmt, self.model, filters)
+
+        if sorting:
+            stmt = self.sorting_callback(stmt, self.model, sorting.order_by, sorting.order == SortOrder.descending)
+
+        if preloads:
+            options = build_relation(self.model, [x[0] for x in preloads_mapper])
+            stmt = stmt.options(*options)
+
+        stmt = (stmt.join(SparePart.locations, isouter=True)
+            .join(SparePartLocationQuantity.institution, isouter=True)
+            .options(
+                contains_eager(SparePart.locations)
+                .contains_eager(SparePartLocationQuantity.institution)
+            )
+            .order_by(Institution.name)
+        )
+
+        count_stmt = select(func.count(self.model.id)).select_from(self.model)
+        if filters:
+            count_stmt = self.filter_callback(count_stmt, self.model, filters)
+
+        total = (await database.execute(count_stmt)).scalar() or 0
+
+        if pagination.limit >= 0:
+            stmt = stmt.offset(pagination.offset).limit(pagination.limit)
+
+        result = await database.execute(stmt)
+        items = result.unique().scalars().all()
+
+        total_pages = max(1, ceil(total / pagination.limit))
+        return {
+            "items": items,
+            "total": total,
+            "page": pagination.page,
+            "pages": total_pages,
+            "limit": pagination.limit,
+            "has_next": pagination.page < total_pages,
+            "has_prev": pagination.page > 1,
+        }
+
 
     async def create(
             self,

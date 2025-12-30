@@ -2,6 +2,7 @@ from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, relationship, mapped_column
 
 from src.database import BaseDatabaseModel
+from src.institution.schemas import Institution
 
 
 class SparePartLocationQuantity(BaseDatabaseModel):
