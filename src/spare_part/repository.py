@@ -11,6 +11,7 @@ from src.exceptions import NotFoundError
 from src.institution.schemas import Institution
 from src.pagination import Pagination
 from src.repository import CRUDRepository
+from src.spare_part.filters import apply_spare_parts_filters
 from src.spare_part.models import SparePartCreate, SparePartUpdate
 from src.spare_part.schemas import SparePart, SparePartLocationQuantity
 from src.spare_part.sorting import apply_spare_parts_sorting
@@ -19,7 +20,11 @@ from src.utils import validate_relationships, build_relation
 
 class SparePartRepository(CRUDRepository[SparePart]):
     def __init__(self):
-        super().__init__(SparePart, sorting_callback=apply_spare_parts_sorting)
+        super().__init__(
+            SparePart,
+            filter_callback=apply_spare_parts_filters,
+            sorting_callback=apply_spare_parts_sorting
+        )
 
     async def paginate(
             self,
@@ -162,15 +167,15 @@ class SparePartRepository(CRUDRepository[SparePart]):
             for compatible_model_obj in compatible_model_objs:
                 spare_part_obj.compatible_models.append(compatible_model_obj)
 
-        incoming_ids = {
-            loc.institution_id
-            for loc in data_model.locations
-        }
-        for location in spare_part_obj.locations:
-            if location.institution_id not in incoming_ids:
-                await database.delete(location)
-
         if "locations" in overwrite_relationships and data_model.locations is not None:
+            incoming_ids = {
+                loc.institution_id
+                for loc in data_model.locations
+            }
+            for location in spare_part_obj.locations:
+                if location.institution_id not in incoming_ids:
+                    await database.delete(location)
+
             existing_locations = {
                 loc.institution_id: loc
                 for loc in spare_part_obj.locations
@@ -197,7 +202,20 @@ class SparePartRepository(CRUDRepository[SparePart]):
 
         await database.commit()
 
+        if "locations" in preloads:
+            preloads.remove("locations")
+
         options = build_relation(SparePart, preloads)
+        stmt = (stmt
+                .join(SparePart.locations, isouter=True)
+                .join(SparePartLocationQuantity.institution, isouter=True)
+                .options(
+                    contains_eager(SparePart.locations)
+                    .contains_eager(SparePartLocationQuantity.institution)
+                )
+                .order_by(Institution.name)
+        )
+
         stmt = (
             select(SparePart)
             .options(*options)

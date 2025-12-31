@@ -1,32 +1,48 @@
-from sqlalchemy import func, select
+from sqlalchemy import func, select, case
 from sqlalchemy.orm import aliased
 
+from src.equipment_model.schemas import EquipmentModel
 from src.filter import apply_filters, ModelType
 from src.spare_part.models import SparePartState
+from src.spare_part.schemas import SparePart, SparePartLocationQuantity
 
 
-def spare_part_filter(stmt, model: ModelType, filters: dict):
+def apply_spare_parts_filters(stmt, model: ModelType, filters: dict):
     stmt = apply_filters(stmt, model, filters)
-    if "stock_state" in filters:
-        loc = aliased(model.locations.property.mapper.class_)
+    if "stock_status__eq" in filters:
+        locations = aliased(model.locations.property.mapper.class_)
+
         qty_subq = (
             select(
-                loc.spare_part_id.label("spare_part_id"),
-                func.coalesce(func.sum(loc.quantity), 0).label("total_quantity"),
+                locations.spare_part_id.label("spare_part_id"),
+                func.sum(locations.quantity).label("total_quantity"),
             )
-            .group_by(loc.spare_part_id)
+            .group_by(locations.spare_part_id)
             .subquery()
         )
 
-        stmt = stmt.outerjoin(qty_subq, qty_subq.c.spare_part_id == model.id)
-        total_qty_col = func.coalesce(qty_subq.c.total_quantity, 0)
+        total_qty = func.coalesce(qty_subq.c.total_quantity, 0)
 
-        state = filters["stock_state"]
-        if state == SparePartState.InStock.value:
-            stmt = stmt.where(total_qty_col > model.min_quantity)
-        elif state == SparePartState.OutOfStock.value:
-            stmt = stmt.where(total_qty_col == 0)
-        elif state == SparePartState.LowStock.value:
-            stmt = stmt.where(total_qty_col <= model.min_quantity)
+        stock_case = case(
+            (total_qty == 0, "out_of_stock"),
+            (total_qty <= model.min_quantity, "low_stock"),
+            else_="in_stock",
+        )
+
+        stmt = (
+            stmt
+            .outerjoin(qty_subq, qty_subq.c.spare_part_id == model.id)
+            .where(stock_case == filters["stock_status__eq"])
+        )
+
+    if "compatible_model_id__eq" in filters:
+        stmt = stmt.where(SparePart.compatible_models.any(EquipmentModel.id == filters["compatible_model_id__eq"]))
+
+    if "institution_id__eq" in filters:
+        stmt = stmt.where(
+            SparePart.locations.any(
+                SparePartLocationQuantity.institution_id == filters["institution_id__eq"]
+            )
+        )
 
     return stmt

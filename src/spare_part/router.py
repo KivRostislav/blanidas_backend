@@ -6,12 +6,11 @@ from src.database import DatabaseSession
 from src.pagination import Pagination
 from src.pagination import PaginationResponse
 from src.mailer.dependencies import MailerServiceDep
-from src.spare_part.filters import spare_part_filter
 from src.spare_part.models import SparePartInfo, SparePartFilters, SparePartCreate, SparePartUpdate, SparePartsSortBy
 from src.spare_part.services import SparePartServices
 
 router = APIRouter(prefix="/spare-parts", tags=["Spare Parts"])
-services = SparePartServices(filter_callback=spare_part_filter)
+services = SparePartServices()
 
 @router.get("/", response_model=PaginationResponse[SparePartInfo])
 async def get_spare_part_list_endpoint(

@@ -26,11 +26,14 @@ def apply_spare_parts_sorting(stmt, model: SparePart, order_by: str, desc: bool)
                 total_quantity_subq.c.total_quantity > 0,
                 total_quantity_subq.c.total_quantity < SparePart.min_quantity
             ), 1),
-            (total_quantity_subq.c.total_quantity == 0, 0),
+            else_=0,
         )
 
-        status_subq = (select(SparePart.id.label("spare_part_id"), status.label("status"))
-                       .outerjoin(total_quantity_subq, SparePart.id == total_quantity_subq.c.spare_part_id).subquery())
+        status_subq = (
+            select(SparePart.id.label("spare_part_id"), status.label("status"))
+                .outerjoin(total_quantity_subq, SparePart.id == total_quantity_subq.c.spare_part_id)
+                .subquery()
+        )
 
         return (
             stmt

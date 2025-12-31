@@ -18,8 +18,8 @@ from src.repository import FilterCallback
 
 
 class SparePartServices(GenericServices[SparePart, SparePartInfo]):
-    def __init__(self, filter_callback: FilterCallback):
-        super().__init__(CRUDRepository(SparePart, filter_callback), SparePartInfo)
+    def __init__(self):
+        super().__init__(CRUDRepository(SparePart), SparePartInfo)
 
         self.repo = SparePartRepository()
         self.spare_part_location_quantity_repo = CRUDRepository(SparePartLocationQuantity)
@@ -64,7 +64,6 @@ class SparePartServices(GenericServices[SparePart, SparePartInfo]):
                     payload=LowStockMessagePayload(
                         receiver_username=receiver.username,
                         spare_part_name=spare_part.name,
-                        spare_part_serial_number=spare_part.serial_number,
                         spare_part_current_quantity=quantity,
                         spare_part_min_quantity=spare_part.min_quantity,
                     )
