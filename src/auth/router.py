@@ -1,96 +1,74 @@
 from typing import Annotated
 
 from fastapi import APIRouter
-from fastapi.params import Depends
+from fastapi.params import Depends, Query
 from fastapi.security import OAuth2PasswordRequestForm
 
+from sorting import SortOrder, Sorting
 from src.auth.dependencies import allowed, current_user
 from src.auth.models import UserCreate, TokenInfo, UserUpdate, UserDelete, \
-    UserFilters, UserInfo, UserPaginationResponse, ScopeInfo, TokenRefresh, LoginResponse, Login
-from src.auth.schemas import Role, User, Scopes
-from src.auth.services import AuthServices, ScopeServices
+    UserFilters, UserInfo, UserPaginationResponse, TokenRefresh, LoginResponse, Login, UserSortBy
+from src.auth.schemas import Role, User
+from src.auth.services import AuthServices
 from src.database import DatabaseSession
 from src.config import SettingsDep
 from src.pagination import Pagination, PaginationResponse
 
 router = APIRouter(prefix="/users", tags=["Users"])
 auth_services = AuthServices()
-scope_services = ScopeServices()
 
-@router.get("/", response_model=UserPaginationResponse)
+@router.get("/", response_model=PaginationResponse[UserInfo])
 async def get_users_list_endpoint(
         database: DatabaseSession,
         filters: UserFilters = Depends(),
         pagination: Pagination = Depends(),
-        current: User = Depends(
-            current_user(
-                scopes=[Scopes.create_users],
-                role=Role.manager
-            )
-        )
-) -> UserPaginationResponse:
-    return await auth_services.list_with_current(
-        current_user_id=current.id,
+        sort_by: UserSortBy | None = Query(None),
+        sort_order: SortOrder = Query(SortOrder.ascending),
+        current: User = Depends(current_user(role=Role.manager))
+) -> PaginationResponse[UserInfo]:
+    filters_data = filters.model_dump(exclude_none=True)
+    filters_data["id__ne"] = current.id
+    return await auth_services.paginate(
+        sorting=Sorting(order=sort_order, order_by=sort_by) if sort_by else None,
         database=database,
         pagination=pagination,
-        filters=filters.model_dump(exclude_none=True),
-        preloads=["scopes", "workplace"],
+        filters=filters_data,
+        preloads=["workplace"],
     )
 
 @router.post("/", response_model=UserInfo)
 async def create_user_endpoint(
         model: UserCreate,
         database: DatabaseSession,
-        _:  Annotated[None, Depends(
-            allowed(
-                role=Role.manager,
-                scopes=[Scopes.create_users]
-            )
-        )]
 ) -> UserInfo:
     return await auth_services.create(
         data=model.model_dump(exclude_none=True),
         database=database,
         unique_fields=["username", "email"],
-        relationship_fields=["scopes", "workplace"],
-        preloads=[
-            "scopes",
-            "workplace",
-        ]
+        relationship_fields=["workplace"],
+        preloads=["workplace"]
     )
 
 @router.put("/", response_model=UserInfo)
 async def update_user_endpoint(
         model: UserUpdate,
         database: DatabaseSession,
-        _: Annotated[None, Depends(
-            allowed(
-                role=Role.manager,
-                scopes=[Scopes.create_users]
-            )
-        )]
 ) -> UserInfo:
     return await auth_services.update(
         id_=model.id,
         data=model.model_dump(exclude_none=True),
         database=database,
         unique_fields=["username", "email"],
-        relationship_fields=["scopes"],
-        preloads=["scopes", "workplace"]
+        preloads=["workplace"]
     )
 
-@router.delete("/", response_model=None)
+@router.delete("/{id_}", response_model=None)
 async def delete_user_endpoint(
-        model: UserDelete,
+        id_: int,
         database: DatabaseSession,
-        _: Annotated[None, Depends(
-            allowed(
-                role=Role.manager,
-                scopes=[Scopes.create_users]
-            )
-        )]
+        _: Annotated[None, Depends(allowed(role=Role.manager))]
 ) -> None:
-    return await auth_services.delete(id_=model.id, database=database)
+    return await auth_services.delete(id_=id_, database=database)
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -116,16 +94,3 @@ async def refresh_token_endpoint(
         jwt_settings=settings.jwt,
         database=database
     )
-
-@router.get("/scopes/{role}", response_model=PaginationResponse[ScopeInfo])
-async def get_scopes_endpoint(
-        role: Role,
-        database: DatabaseSession,
-        pagination: Pagination = Depends(),
-) -> PaginationResponse[ScopeInfo]:
-    return await scope_services.paginate(
-        database=database,
-        filters={"role": role},
-        pagination=pagination,
-    )
-

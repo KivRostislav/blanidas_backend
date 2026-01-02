@@ -176,11 +176,11 @@ SUMMARY_RULES = {
         "response_model": EquipmentSummary,
         "rules": equipment_rules,
     },
-    "user": {
+    "users": {
         "response_model": UserSummary,
         "rules": user_rules,
     },
-    "institution": {
+    "institutions": {
         "response_model": InstitutionSummary,
         "rules": institution_rules,
     },

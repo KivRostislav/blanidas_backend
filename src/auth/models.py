@@ -1,22 +1,14 @@
 from datetime import date
+from enum import Enum
 from typing import Optional, List
 
 from pydantic import BaseModel, EmailStr, Field
 from pydantic_extra_types.phone_numbers import PhoneNumber
 
-from src.auth.schemas import Role, Scopes
+from src.auth.schemas import Role
 from src.institution.models import InstitutionInfo
 from src.pagination import PaginationResponse
 
-
-class ScopeInfo(BaseModel):
-    id: int
-    name: str
-    role: Role
-
-class ScopeCreate(BaseModel):
-    role: Role
-    name: str
 
 class UserInfo(BaseModel):
     id: int
@@ -24,7 +16,6 @@ class UserInfo(BaseModel):
     email: EmailStr
     phone_number: PhoneNumber
     role: Role
-    scopes: list[ScopeInfo]
     department: str
     workplace: InstitutionInfo | None = None
     hire_at: date
@@ -44,9 +35,11 @@ class UserShortInfo(BaseModel):
     email: EmailStr
 
 class UserFilters(BaseModel):
-    username: Optional[str] = None
-    email: Optional[EmailStr] = None
-    role: Optional[Role] = None
+    username__ilike: str | None = None
+    role__eq: Role | None = None
+
+class UserSortBy(str, Enum):
+    username = "username"
 
 class UserCreate(BaseModel):
     password: str = Field(min_length=8, max_length=64)
@@ -54,7 +47,6 @@ class UserCreate(BaseModel):
     email: EmailStr
     phone_number: PhoneNumber
     role: Role
-    scopes_ids: List[int]
     department: str
     workplace_id: Optional[int]
     hire_at: date
@@ -70,7 +62,6 @@ class UserUpdate(BaseModel):
     email: EmailStr | None = None
     phone_number: PhoneNumber | None = None
     role: Role | None = None
-    scopes: List[Scopes] | None = None
     department: str | None = None
     workplace_id: Optional[int] | None = None
     hire_at: date | None = None

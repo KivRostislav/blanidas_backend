@@ -7,9 +7,10 @@ import jwt
 from pydantic import ValidationError
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.util import preloaded
 
-from src.auth.models import TokenInfo, UserInfo, UserPaginationResponse, ScopeInfo, LoginResponse
-from src.auth.schemas import User, Scope, Scopes, Role
+from src.auth.models import TokenInfo, UserInfo, UserPaginationResponse, LoginResponse
+from src.auth.schemas import User, Role
 from src.auth.utils import generate_jwt_token, TokenType, generate_payload
 from src.config import JWTSettings
 from src.exceptions import UniqueConstraintError
@@ -87,35 +88,11 @@ class AuthServices(GenericServices[User, UserInfo]):
             preloads=preloads,
         )
 
-    async def list_with_current(
-            self,
-            current_user_id: int,
-            database: AsyncSession,
-            pagination: Pagination,
-            filters: dict[str, Any] | Any = None,
-            preloads: list[str] | None = None,
-    ) -> UserPaginationResponse:
-        filters.update({"id__ne": current_user_id })
-        result = await self.repo.paginate(
-            database=database,
-            pagination=pagination,
-            filters=filters,
-            preloads=preloads,
-        )
-
-        result["items"] = [self.return_type.model_validate(x, from_attributes=True) for x in result["items"]]
-        result["current"] = (await self.list(
-            filters={"id": current_user_id},
-            database=database,
-            preloads=["scopes", "workplace"],
-        ))[0]
-        return UserPaginationResponse.model_validate(result)
-
     async def login(self, data: dict[str, Any], jwt_settings: JWTSettings, database: AsyncSession) -> LoginResponse:
         user = await self.repo.get(
             filters={"email": data["email"]},
             database=database,
-            preloads=["scopes"]
+            preloads=["workplace"]
         )
 
         if not user:
@@ -140,7 +117,7 @@ class AuthServices(GenericServices[User, UserInfo]):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid refresh token")
 
         try:
-            user = await self.repo.list(id_=token_data["id"], database=database, preloads=["scopes"])
+            user = await self.repo.list(id_=token_data["id"], database=database)
         except HTTPException:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email or password")
 
@@ -153,7 +130,6 @@ class AuthServices(GenericServices[User, UserInfo]):
             data: dict[str, Any],
             database: AsyncSession,
             jwt_settings: JWTSettings,
-            scopes: list[Scopes] | None = None,
             role: Role | None = None,
     ) -> IsAllowedReturnType:
         try:
@@ -161,36 +137,11 @@ class AuthServices(GenericServices[User, UserInfo]):
         except (InvalidTokenError, ValidationError):
             return IsAllowedReturnType(is_allowed=False, user=None)
 
-        id_ = payload.list("id")
-        payload_scopes = payload.list("scopes").split(" ")
-        payload_role = payload.list("role")
-        user = (await self.repo.list(filters={"id": id_}, database=database, preloads=["scopes"]))[0]
+        id_ = payload.get("id")
+        payload_role = payload.get("role")
+        user = (await self.repo.list(filters={"id": id_}, database=database))[0]
         if not user:
             return IsAllowedReturnType(is_allowed=False, user=None)
-        if scopes:
-            for scope in scopes:
-                if scope not in payload_scopes:
-                    return IsAllowedReturnType(is_allowed=False, user=None)
         if role and payload_role != role:
             return IsAllowedReturnType(is_allowed=False, user=None)
         return IsAllowedReturnType(is_allowed=True, user=user)
-
-
-class ScopeServices(GenericServices[Scope, ScopeInfo]):
-    def __init__(self):
-        super().__init__(CRUDRepository(Scope), ScopeInfo)
-
-    async def create_if_not_exist(self, data: list[dict[str, Any]], database: AsyncSession) -> list[ScopeInfo]:
-        result = []
-        for scope_data in data:
-            try:
-                scope = await self.create(
-                    data=scope_data,
-                    database=database,
-                    unique_fields=["name"],
-                )
-                result.append(ScopeInfo.model_validate(scope, from_attributes=True))
-            except UniqueConstraintError:
-                continue
-
-        return result

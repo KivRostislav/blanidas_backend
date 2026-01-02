@@ -7,16 +7,26 @@ from src.filter import sorting_apply
 def apply_spare_parts_sorting(stmt, model: SparePart, order_by: str, desc: bool):
     total_quantity = func.coalesce(func.sum(SparePartLocationQuantity.quantity), 0)
     total_quantity_subq = (
-        select(SparePartLocationQuantity.spare_part_id, total_quantity.label("total_quantity"))
+        select(
+            SparePartLocationQuantity.spare_part_id,
+            total_quantity.label("total_quantity"),
+        )
         .group_by(SparePartLocationQuantity.spare_part_id)
         .subquery()
     )
 
     if order_by == SparePartsSortBy.quantity.value:
+        total_qty = func.coalesce(total_quantity_subq.c.total_quantity, 0)
+
         return (
             stmt
-            .outerjoin(total_quantity_subq, SparePart.id == total_quantity_subq.c.spare_part_id)
-            .order_by(total_quantity_subq.c.total_quantity.desc() if desc else total_quantity_subq.c.total_quantity.asc())
+            .outerjoin(
+                total_quantity_subq,
+                SparePart.id == total_quantity_subq.c.spare_part_id
+            )
+            .order_by(
+                total_qty.desc() if desc else total_qty.asc()
+            )
         )
 
     if order_by == SparePartsSortBy.status.value:

@@ -254,7 +254,7 @@ class CRUDRepository(Generic[ModelType]):
 
         if preloads:
             options = build_relation(self.model, preloads)
-            stmt = select(self.model).options(*options).where(self.model.id == obj.id)
+            stmt = select(self.model).options(*options).where(self.model.id == obj.id).execution_options(populate_existing=True)
             result = await database.execute(stmt)
             return result.scalars().first()
 

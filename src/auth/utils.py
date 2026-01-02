@@ -17,7 +17,6 @@ def generate_payload(model: User) -> dict[str, Any]:
         "sub": model.email,
         "username": model.username,
         "role": model.role,
-        "scopes": " ".join([x.name for x in model.scopes]),
         "id": model.id,
     }
 

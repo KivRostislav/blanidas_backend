@@ -24,7 +24,7 @@ from src.spare_part_category.schemas import SparePartCategory
 from src.spare_part.schemas import SparePart
 from src.repair_request.schemas import RepairRequest
 from src.failure_type.schemas import FailureType
-from src.auth.schemas import User, Scope
+from src.auth.schemas import User
 
 
 config = context.config

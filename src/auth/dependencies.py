@@ -4,7 +4,7 @@ from fastapi import status, HTTPException
 from fastapi.params import Depends
 from fastapi.security import OAuth2PasswordBearer
 
-from src.auth.schemas import User, Scopes, Role
+from src.auth.schemas import User, Role
 from src.auth.services import AuthServices
 from src.database import DatabaseSession
 from src.config import JWTSettingsDep
@@ -13,12 +13,11 @@ from src.config import JWTSettingsDep
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl="/users/tokens",
     auto_error=False,
-    scopes={scope.value: f"Allows to {scope.value.replace('_', ' ')}" for scope in Scopes}
 )
 
 auth_services = AuthServices()
 
-def current_user(scopes: List[Scopes], role: Optional[Role]):
+def current_user(role: Optional[Role]):
     async def wrapper(
             access_token: Annotated[str, Depends(oauth2_scheme)],
             jwt_settings: JWTSettingsDep,
@@ -33,7 +32,6 @@ def current_user(scopes: List[Scopes], role: Optional[Role]):
             database=database,
             jwt_settings=jwt_settings,
             role=role,
-            scopes=scopes
         )
         if not result.is_allowed:
             raise exception
@@ -42,7 +40,7 @@ def current_user(scopes: List[Scopes], role: Optional[Role]):
 
     return wrapper
 
-def allowed(scopes: list[Scopes] | None = None, role: Role | None = None):
+def allowed(role: Role | None = None):
     async def wrapper(
             access_token: Annotated[str, Depends(oauth2_scheme)],
             jwt_settings: JWTSettingsDep,
@@ -57,7 +55,6 @@ def allowed(scopes: list[Scopes] | None = None, role: Role | None = None):
             database=database,
             jwt_settings=jwt_settings,
             role=role,
-            scopes=scopes
         )
         if not result.is_allowed:
             raise exception
