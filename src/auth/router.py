@@ -83,7 +83,7 @@ async def login(
         database=database,
     )
 
-@router.post("/tokens/refresh", response_model=TokenInfo)
+@router.post("/refresh", response_model=TokenInfo)
 async def refresh_token_endpoint(
         model: TokenRefresh,
         settings: SettingsDep,

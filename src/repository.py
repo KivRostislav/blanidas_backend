@@ -266,7 +266,7 @@ class CRUDRepository(Generic[ModelType]):
             id_: int,
             database: AsyncSession,
             relationship_fields: list[str] | None = None,
-    ) -> None:
+    ) -> int:
         relationship_fields = relationship_fields or []
 
         options = build_relation(self.model, relationship_fields)
@@ -279,6 +279,8 @@ class CRUDRepository(Generic[ModelType]):
 
         await database.delete(obj)
         await database.commit()
+
+        return id_
 
     async def delete_many(self, ids: list[int], database: AsyncSession) -> None:
         stmt = select(self.model).where(self.model.id.in_(ids))

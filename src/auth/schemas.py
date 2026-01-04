@@ -32,7 +32,7 @@ class User(BaseDatabaseModel):
     phone_number: Mapped[str] = mapped_column()
     role: Mapped[Role] = mapped_column()
 
-    workplace_id: Mapped[Optional[int]] = mapped_column(ForeignKey("institution.id"), nullable=True)
+    workplace_id: Mapped[Optional[int]] = mapped_column(ForeignKey("institution.id", ondelete="SET NULL"), nullable=True)
     workplace: Mapped[Optional["Institution"]] = relationship(back_populates="users", lazy="noload")
 
     department: Mapped[str] = mapped_column()

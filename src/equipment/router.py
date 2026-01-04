@@ -1,7 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from fastapi.params import Depends
 
-from src.equipment.models import EquipmentFilters, EquipmentCreate, EquipmentUpdate, EquipmentInfo
+from sorting import SortOrder, Sorting
+from src.equipment.models import EquipmentFilters, EquipmentCreate, EquipmentUpdate, EquipmentInfo, EquipmentSortBy
 from src.equipment.services import EquipmentServices
 from src.pagination import PaginationResponse, Pagination
 from src.database import DatabaseSession
@@ -14,10 +15,13 @@ async def get_equipment_list_endpoint(
         database: DatabaseSession,
         pagination: Pagination = Depends(),
         filters: EquipmentFilters = Depends(),
+        sort_by: EquipmentSortBy | None = Query(None),
+        sort_order: SortOrder = Query(SortOrder.ascending),
 ) -> PaginationResponse[EquipmentInfo]:
     return await services.paginate(
         database=database,
         pagination=pagination,
+        sorting=Sorting(order=sort_order, order_by=sort_by) if sort_by else None,
         filters=filters.model_dump(exclude_none=True),
         preloads=[
             "equipment_model",

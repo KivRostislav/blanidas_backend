@@ -1,9 +1,11 @@
 from fastapi import APIRouter
-from fastapi.params import Depends
+from fastapi.params import Depends, Query
 
+from sorting import SortOrder, Sorting
 from src.database import DatabaseSession
 from src.pagination import Pagination
-from src.manufacturer.models import ManufacturerInfo, ManufacturerFilters, ManufacturerCreate, ManufacturerUpdate
+from src.manufacturer.models import ManufacturerInfo, ManufacturerFilters, ManufacturerCreate, ManufacturerUpdate, \
+    ManufacturerOrderBy
 from src.manufacturer.services import ManufacturerServices
 from src.pagination import PaginationResponse
 
@@ -15,10 +17,13 @@ async def get_manufacturer_list_endpoint(
         database: DatabaseSession,
         pagination: Pagination = Depends(),
         filters: ManufacturerFilters = Depends(),
+        sort_by: ManufacturerOrderBy | None = Query(None),
+        sort_order: SortOrder = Query(SortOrder.ascending),
 ) -> PaginationResponse[ManufacturerInfo]:
     return await services.paginate(
         database=database,
         pagination=pagination,
+        sorting=Sorting(order=sort_order, order_by=sort_by) if sort_by else None,
         filters=filters.model_dump(exclude_none=True)
     )
 

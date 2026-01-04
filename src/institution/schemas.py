@@ -15,10 +15,15 @@ class Institution(BaseDatabaseModel):
     institution_type: Mapped["InstitutionType"] = relationship(back_populates="institutions", lazy="noload")
 
     equipment: Mapped[list["Equipment"]] = relationship(back_populates="institution", lazy="noload")
-    spare_part_locations: Mapped[list["SparePartLocationQuantity"]] = relationship(back_populates="institution", lazy="noload")
     users: Mapped[list["User"]] = relationship(back_populates="workplace", lazy="noload")
 
     contact_email: Mapped[str] = mapped_column()
     contact_phone: Mapped[str] = mapped_column()
 
     used_spare_parts: Mapped[list["UsedSparePart"]] = relationship(back_populates="institution", lazy="noload")
+    spare_part_locations: Mapped[list["SparePartLocationQuantity"]] = relationship(
+        back_populates="institution",
+        lazy="noload",
+        cascade="all, delete-orphan",
+    )
+

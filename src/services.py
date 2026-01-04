@@ -58,8 +58,8 @@ class GenericServices(Generic[ModelType, InfoType]):
             id_: int,
             database: AsyncSession,
             relationship_fields: list[str] | None = None,
-    ) -> None:
-        await self.repo.delete(
+    ) -> int:
+        return await self.repo.delete(
             id_=id_,
             database=database,
             relationship_fields=relationship_fields

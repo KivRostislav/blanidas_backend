@@ -67,6 +67,8 @@ class RepairRequest(BaseDatabaseModel):
     created_at: Mapped[datetime] = mapped_column()
     completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
+    last_status: Mapped[RepairRequestStatus] = mapped_column(nullable=True) #sdfjdfslldfsdfsjdsfkdslfjsklfsjf;lskdjfd
+
     manager_note: Mapped[str] = mapped_column()
     engineer_note: Mapped[str] = mapped_column()
 

@@ -117,7 +117,7 @@ class AuthServices(GenericServices[User, UserInfo]):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid refresh token")
 
         try:
-            user = await self.repo.list(id_=token_data["id"], database=database)
+            user = await self.repo.get({ "id__eq": token_data["id"] }, database=database)
         except HTTPException:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email or password")
 

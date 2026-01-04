@@ -1,7 +1,12 @@
+from enum import Enum
+
 from pydantic import BaseModel
 
 class ManufacturerFilters(BaseModel):
-    name__like: str | None = None
+    name__ilike: str | None = None
+
+class ManufacturerOrderBy(str, Enum):
+    name = "name"
 
 class ManufacturerInfo(BaseModel):
     id: int

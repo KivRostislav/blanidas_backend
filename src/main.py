@@ -47,14 +47,6 @@ async def lifespan(_: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.include_router(router)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*", "http://localhost:5174/"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # @app.middleware("http")
 async def error_handler(request: Request, call_next):
     try:
@@ -67,3 +59,11 @@ async def error_handler(request: Request, call_next):
     except Exception:
         return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
     return response
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)

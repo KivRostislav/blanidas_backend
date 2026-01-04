@@ -17,7 +17,7 @@ class InstitutionInfo(BaseModel):
 class InstitutionFilters(BaseModel):
     name__like: str | None = None
     address__like: str | None = None
-    institution_type_id: int | None = None
+    institution_type_id__eq: int | None = None
 
 class InstitutionOrderBy(str, Enum):
     equipment_country = "equipment_country"

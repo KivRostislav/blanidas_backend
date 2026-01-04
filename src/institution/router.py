@@ -55,7 +55,7 @@ async def update_institution_endpoint(
         preloads=["institution_type"]
     )
 
-@router.delete("/{id_}", response_model=None)
-async def delete_institution_endpoint(id_: int, database: DatabaseSession) -> None:
+@router.delete("/{id_}", response_model=int)
+async def delete_institution_endpoint(id_: int, database: DatabaseSession) -> int:
     return await services.delete(id_=id_, database=database)
 

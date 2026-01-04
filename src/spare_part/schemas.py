@@ -11,7 +11,7 @@ class SparePartLocationQuantity(BaseDatabaseModel):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     quantity: Mapped[int] = mapped_column()
 
-    institution_id: Mapped[int | None] = mapped_column(ForeignKey("institution.id"), nullable=True)
+    institution_id: Mapped[int | None] = mapped_column(ForeignKey("institution.id", ondelete="CASCADE"), nullable=True)
     institution: Mapped["Institution"] = relationship(back_populates="spare_part_locations", lazy="noload")
 
     spare_part_id: Mapped[int | None] = mapped_column(ForeignKey("spare_part.id", ondelete="CASCADE"))
