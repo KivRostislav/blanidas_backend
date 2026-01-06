@@ -1,7 +1,5 @@
 from pydantic import BaseModel
 
-class EquipmentModelFilters(BaseModel):
-    name__like: str | None = None
 
 class EquipmentModelInfo(BaseModel):
     id: int

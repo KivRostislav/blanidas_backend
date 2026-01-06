@@ -5,9 +5,6 @@ class FailureTypeInfo(BaseModel):
     id: int
     name: str
 
-class FailureTypeFilters(BaseModel):
-    name__like: str | None = None
-
 class FailureTypeCreate(BaseModel):
     name: str
 

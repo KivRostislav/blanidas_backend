@@ -1,120 +1,98 @@
-import logging
-from collections.abc import Callable
-from typing import Generic, TypeVar, Type, Any
+from typing import Generic, TypeVar, Type
 
-from fastapi import HTTPException, status
-from sqlalchemy import select, func, Select
+from sqlalchemy import select, func, inspect, insert, delete, update, distinct
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sorting import Sorting, SortOrder
-from src.exceptions import UniqueConstraintError, ForeignKeyNotFoundError, NotFoundError
-from src.filter import apply_filters, sorting_apply
-from src.pagination import Pagination
-from src.utils import build_relation, validate_uniqueness, validate_relationships
+from src.sorting import Sorting, apply_sorting_wrapper, apply_sorting
+from src.decorators import integrity_errors
+from src.exceptions import DomainError, ErrorCode
+from src.filters import apply_filters, apply_filters_wrapper
+from src.sorting import SortingCallback
+from src.utils import build_relation
+from src.filters import FilterCallback, Filters
 
-from math import ceil
 
 ModelType = TypeVar("ModelType")
-FilterCallback = Callable[[Select[Any], Type[ModelType], dict[str, Any]], Select[Any]]
-SortingCallback = Callable[[Select[Any], Type[ModelType], str, bool], Select[Any]]
 
 class CRUDRepository(Generic[ModelType]):
     def __init__(
             self,
             model: Type[ModelType],
-            filter_callback: FilterCallback = apply_filters,
-            sorting_callback: SortingCallback = sorting_apply,
+            filter_callback: FilterCallback = apply_filters_wrapper(apply_filters, {}),
+            sorting_callback: SortingCallback = apply_sorting_wrapper(apply_sorting, {}),
     ):
         self.model = model
         self.filter_callback = filter_callback
         self.sorting_callback = sorting_callback
 
-    async def paginate(
+    async def fetch(
             self,
             database: AsyncSession,
-            pagination: Pagination,
-            filters: dict | None = None,
+            filters: Filters | None = None,
             preloads: list[str] | None = None,
             sorting: Sorting | None = None,
-    ) -> dict:
-        preloads = preloads if preloads else []
-        filters = filters if filters else {}
+            offset: int | None = None,
+            limit: int | None = None,
+    ) -> tuple[list[ModelType], int]:
+        filters = filters or {}
+        preloads = preloads or []
 
         stmt = select(self.model)
-        stmt = self.filter_callback(stmt, self.model, filters)
+        stmt = self.filter_callback(stmt, filters)
 
         if sorting:
-            stmt = self.sorting_callback(stmt, self.model, sorting.order_by, sorting.order == SortOrder.descending)
+            stmt = self.sorting_callback(stmt, sorting)
 
         if preloads:
             options = build_relation(self.model, preloads)
             stmt = stmt.options(*options)
 
-        count_stmt = select(func.count(self.model.id)).select_from(self.model)
+        count_stmt = select(func.count(distinct(self.model.id))).select_from(self.model)
         if filters:
-            count_stmt = self.filter_callback(count_stmt, self.model, filters)
+            count_stmt = self.filter_callback(count_stmt, filters)
 
         total = (await database.execute(count_stmt)).scalar() or 0
 
-        if pagination.limit >= 0:
-            stmt = stmt.offset(pagination.offset).limit(pagination.limit)
+        if limit is not None and limit != -1:
+            stmt = stmt.offset(offset or 0).limit(limit)
 
         result = await database.execute(stmt)
         items = result.unique().scalars().all()
 
-        total_pages = max(1, ceil(total / pagination.limit))
-        return {
-            "items": items,
-            "total": total,
-            "page": pagination.page,
-            "pages": total_pages,
-            "limit": pagination.limit,
-            "has_next": pagination.page < total_pages,
-            "has_prev": pagination.page > 1,
-        }
+        return list(items), total
 
-    async def create(
-            self,
-            data: dict,
-            database: AsyncSession,
-            unique_fields: list[str] | None = None,
-            relationship_fields: list[str] | None = None,
-            preloads: list[str] | None = None,
-    ) -> ModelType:
-        unique_fields = unique_fields or []
-        relationship_fields = relationship_fields or []
+    async def get(self, id_: int, database: AsyncSession, preloads: list[str] | None = None) -> ModelType | None:
+        options = build_relation(self.model, preloads or [])
+        stmt = select(self.model).options(*options).where(self.model.id == id_)
+        return (await database.execute(stmt)).unique().scalars().first()
+
+    @integrity_errors()
+    async def create(self, data: dict, database: AsyncSession, preloads: list[str] | None = None) -> ModelType:
         preloads = preloads or []
 
-        if not await validate_uniqueness(self.model, data, database, unique_fields):
-            raise UniqueConstraintError()
-
-        if not await validate_relationships(self.model, data, database, relationship_fields):
-            raise ForeignKeyNotFoundError()
-
-        many_to_many: list[str] = []
-        data_copy = data.copy()
-
-        for field in relationship_fields:
-            ids_key = f"{field}_ids"
-            if ids_key in data_copy:
-                del data_copy[ids_key]
-                many_to_many.append(field)
-
-        obj = self.model(**data_copy)
-
-        for field in many_to_many:
-            rel = self.model.__mapper__.relationships[field]
-            rel_model = rel.mapper.class_
-
-            ids = data[f"{field}_ids"]
-            result = await database.execute(
-                select(rel_model).where(rel_model.id.in_(ids))
-            )
-            related_objs = result.scalars().all()
-
-            getattr(obj, field).extend(related_objs)
-
+        obj = self.model(**data)
         database.add(obj)
+        await database.flush()
+
+        association_inserts = []
+        for field in inspect(self.model).relationships:
+            if field.secondary is None:
+                continue
+
+            if field.key not in data:
+                continue
+
+            ids = data[field.key]
+            left_col, right_col = list(field.secondary.c)
+
+            association_inserts.extend([
+                {left_col.name: obj.id, right_col.name: related_id} for related_id in ids
+            ])
+
+            if association_inserts:
+                stmt = insert(field.secondary).values(association_inserts)
+                await database.execute(stmt)
+
         await database.commit()
 
         preload_options = build_relation(self.model, preloads)
@@ -127,193 +105,51 @@ class CRUDRepository(Generic[ModelType]):
         result = await database.execute(stmt)
         return result.scalars().first()
 
-    async def create_many(
-            self,
-            data_list: list[dict],
-            database: AsyncSession,
-            unique_fields: list[str] | None = None,
-            relationship_fields: list[str] | None = None,
-            preloads: list[str] | None = None,
-    ) -> list[ModelType]:
-        unique_fields = unique_fields or []
-        relationship_fields = relationship_fields or []
+    @integrity_errors()
+    async def update(self, id_: int, data: dict, database: AsyncSession, preloads: list[str] | None = None) -> ModelType:
         preloads = preloads or []
 
-        created_objects = []
-        for data in data_list:
-            if not await validate_uniqueness(self.model, data, database, unique_fields):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"{self.model.__name__} with the same fields already exists"
-                )
+        rows = await database.execute(update(self.model).where(self.model.id == id_).values(data))
+        if rows.rowcount == 0:
+            raise DomainError(code=ErrorCode.not_entity, field="")
 
-            if not await validate_relationships(self.model, data, database, relationship_fields):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Some foreign keys do not exist"
-                )
-
-            many_to_many = []
-            data_copy = data.copy()
-
-            for field in relationship_fields:
-                if field + "_ids" in data_copy:
-                    many_to_many.append(field)
-                    del data_copy[field + "_ids"]
-
-            obj = self.model(**data_copy)
-            database.add(obj)
-            created_objects.append((obj, many_to_many, data))
-
-        await database.commit()
-        for obj, many_to_many, original_data in created_objects:
-            for field in many_to_many:
-                rel = self.model.__mapper__.relationships[field]
-                rel_model = rel.mapper.class_
-
-                ids = original_data[field + "_ids"]
-                result = await database.execute(
-                    select(rel_model).where(rel_model.id.in_(ids))
-                )
-                related_objs = result.scalars().all()
-                getattr(obj, field).extend(related_objs)
-
-        await database.commit()
-        preload_options = build_relation(self.model, preloads)
-
-        ids = [obj.id for obj, _, _ in created_objects]
-
-        stmt = (
-            select(self.model)
-            .options(*preload_options)
-            .where(self.model.id.in_(ids))
-        )
-
-        result = await database.execute(stmt)
-        return list(result.scalars().all())
-
-    async def update(
-            self,
-            id_: int,
-            data: dict,
-            database: AsyncSession,
-            unique_fields: list[str] | None = None,
-            relationship_fields: list[str] | None = None,
-            overwrite_relationships: list[str] | None = None,
-            preloads: list[str] | None = None,
-    ) -> ModelType:
-        unique_fields = unique_fields or []
-        relationship_fields = relationship_fields or []
-        overwrite_relationships = overwrite_relationships or []
-        preloads = preloads or []
-
-        if not await validate_uniqueness(self.model, data, database, unique_fields, exclude_ids=[id_]):
-            raise UniqueConstraintError()
-
-        options = build_relation(self.model, relationship_fields)
-        stmt = select(self.model).options(*options).where(self.model.id == id_)
-        result = await database.execute(stmt)
-        obj = result.scalars().first()
-
-        if not obj:
-            raise NotFoundError(self.model.__name__, id_)
-
-        if not await validate_relationships(self.model, data, database, relationship_fields):
-            raise ForeignKeyNotFoundError()
-
-        for field, raw_value in data.items():
-            if field.endswith("_ids"):
-                rel_field = field[:-4]
-                if rel_field not in self.model.__mapper__.relationships:
-                    continue
-
-                rel = self.model.__mapper__.relationships[rel_field]
-                rel_model = rel.mapper.class_
-
-                ids = raw_value if isinstance(raw_value, list) else [raw_value]
-                result = await database.execute(select(rel_model).where(rel_model.id.in_(ids)))
-                related_objs = result.scalars().all()
-
-                rel_list = getattr(obj, rel_field)
-                if rel_field in overwrite_relationships:
-                    rel_list.clear()
-                    await database.flush()
-
-                existing_ids = {o.id for o in rel_list}
-                for o in related_objs:
-                    if o.id not in existing_ids:
-                        rel_list.append(o)
+        association_inserts = []
+        for field in inspect(self.model).relationships:
+            if field.secondary is not None:
                 continue
 
-            if hasattr(obj, field):
-                setattr(obj, field, raw_value)
+            if field.key not in data:
+                continue
 
-        database.add(obj)
+            ids = data[field.key]
+            left_col, right_col = list(field.secondary.c)
+            delete_stmt = (delete(field.secondary).where(left_col == id_))
+            await database.execute(delete_stmt)
+
+            association_inserts.extend([{left_col.name: id_, right_col.name: related_id} for related_id in ids])
+
+            if association_inserts:
+                stmt = insert(field.secondary).values(association_inserts)
+                await database.execute(stmt)
+
         await database.commit()
-        await database.refresh(obj)
 
+        stmt = select(self.model)
         if preloads:
             options = build_relation(self.model, preloads)
-            stmt = select(self.model).options(*options).where(self.model.id == obj.id).execution_options(populate_existing=True)
-            result = await database.execute(stmt)
-            return result.scalars().first()
+            stmt = stmt.options(*options)
 
-        return obj
-
-
-    async def delete(
-            self,
-            id_: int,
-            database: AsyncSession,
-            relationship_fields: list[str] | None = None,
-    ) -> int:
-        relationship_fields = relationship_fields or []
-
-        options = build_relation(self.model, relationship_fields)
-        stmt = select(self.model).options(*options).where(self.model.id == id_)
+        stmt = stmt.where(self.model.id == id_).execution_options(populate_existing=True)
         result = await database.execute(stmt)
-        obj = result.scalars().first()
+        return result.scalars().first()
 
-        if not obj:
-            raise NotFoundError(self.model.__name__, id_)
 
-        await database.delete(obj)
+    async def delete(self, id_: int, database: AsyncSession) -> int:
+        stmt = delete(self.model).where(self.model.id == id_)
+        result = await database.execute(stmt)
+        if result.rowcount == 0:
+            raise DomainError(code=ErrorCode.not_entity, field="")
+
         await database.commit()
-
         return id_
-
-    async def delete_many(self, ids: list[int], database: AsyncSession) -> None:
-        stmt = select(self.model).where(self.model.id.in_(ids))
-        result = await database.execute(stmt)
-        objs = result.scalars().all()
-        for obj in objs:
-            await database.delete(obj)
-        await database.commit()
-
-    async def get(
-            self,
-            filters: dict[str, Any],
-            database: AsyncSession,
-            preloads: list[str] | None = None,
-    ) -> ModelType:
-        preloads = preloads or []
-        stmt = select(self.model).options(*build_relation(self.model, preloads))
-        if filters:
-            stmt = self.filter_callback(stmt, self.model, filters)
-
-        return (await database.execute(stmt)).unique().scalars().first()
-
-    async def list(
-            self,
-            filters: dict[str, Any],
-            database: AsyncSession,
-            preloads: list[str] | None = None,
-    ) -> list[ModelType]:
-        preloads = preloads or []
-        stmt = select(self.model).options(*build_relation(self.model, preloads))
-        if filters:
-            stmt = self.filter_callback(stmt, self.model, filters)
-
-        objs = (await database.execute(stmt)).unique().scalars().all() or []
-        return list(objs)
 

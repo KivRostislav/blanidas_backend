@@ -1,13 +1,17 @@
+import json
+
 from fastapi import APIRouter
 from fastapi.params import Depends, Query
 
-from sorting import SortOrder, Sorting
+from src.sorting import SortOrder, Sorting
 from src.database import DatabaseSession
+from src.decorators import domain_errors
+from src.manufacturer.errors import error_map
 from src.pagination import Pagination
-from src.manufacturer.models import ManufacturerInfo, ManufacturerFilters, ManufacturerCreate, ManufacturerUpdate, \
-    ManufacturerOrderBy
+from src.manufacturer.models import ManufacturerInfo, ManufacturerCreate, ManufacturerUpdate
 from src.manufacturer.services import ManufacturerServices
 from src.pagination import PaginationResponse
+
 
 router = APIRouter(prefix="/manufacturers", tags=["Manufacturer"])
 services = ManufacturerServices()
@@ -16,40 +20,26 @@ services = ManufacturerServices()
 async def get_manufacturer_list_endpoint(
         database: DatabaseSession,
         pagination: Pagination = Depends(),
-        filters: ManufacturerFilters = Depends(),
-        sort_by: ManufacturerOrderBy | None = Query(None),
-        sort_order: SortOrder = Query(SortOrder.ascending),
+        sorting: Sorting = Depends(),
+        filters: str | None = Query(None),
 ) -> PaginationResponse[ManufacturerInfo]:
     return await services.paginate(
         database=database,
+        filters=json.loads(filters) if filters else None,
         pagination=pagination,
-        sorting=Sorting(order=sort_order, order_by=sort_by) if sort_by else None,
-        filters=filters.model_dump(exclude_none=True)
+        sorting=None if sorting.sort_by == "" else sorting,
     )
 
 @router.post("/", response_model=ManufacturerInfo)
-async def create_manufacturer_endpoint(
-        model: ManufacturerCreate,
-        database: DatabaseSession,
-) -> ManufacturerInfo:
-    return await services.create(
-        data=model.model_dump(exclude_none=True),
-        database=database,
-        unique_fields=["name"]
-    )
+@domain_errors(error_map)
+async def create_manufacturer_endpoint(model: ManufacturerCreate, database: DatabaseSession,) -> ManufacturerInfo:
+    return await services.create(data=model.model_dump(exclude_none=True), database=database)
 
 @router.put("/", response_model=ManufacturerInfo)
-async def update_manufacturer_endpoint(
-        model: ManufacturerUpdate,
-        database: DatabaseSession,
-) -> ManufacturerInfo:
-    return await services.update(
-        id_=model.id,
-        data=model.model_dump(exclude_none=True),
-        database=database,
-        unique_fields=["name"]
-    )
+@domain_errors(error_map)
+async def update_manufacturer_endpoint(model: ManufacturerUpdate, database: DatabaseSession) -> ManufacturerInfo:
+    return await services.update(id_=model.id, data=model.model_dump(exclude_none=True), database=database)
 
-@router.delete("/{id_}", response_model=None)
-async def delete_manufacturer_endpoint(id_: int, database: DatabaseSession) -> None:
+@router.delete("/{id_}", response_model=int)
+async def delete_manufacturer_endpoint(id_: int, database: DatabaseSession) -> int:
     return await services.delete(id_=id_, database=database)

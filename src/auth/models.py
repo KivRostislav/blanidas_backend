@@ -7,6 +7,7 @@ from pydantic_extra_types.phone_numbers import PhoneNumber
 
 from src.auth.schemas import Role
 from src.institution.models import InstitutionInfo
+from src.models import UkrainianPhoneNumber
 from src.pagination import PaginationResponse
 
 
@@ -14,7 +15,7 @@ class UserInfo(BaseModel):
     id: int
     username: str
     email: EmailStr
-    phone_number: PhoneNumber
+    phone_number: UkrainianPhoneNumber
     role: Role
     department: str
     workplace: InstitutionInfo | None = None
@@ -34,18 +35,11 @@ class UserShortInfo(BaseModel):
     id: int
     email: EmailStr
 
-class UserFilters(BaseModel):
-    username__ilike: str | None = None
-    role__eq: Role | None = None
-
-class UserSortBy(str, Enum):
-    username = "username"
-
 class UserCreate(BaseModel):
     password: str = Field(min_length=8, max_length=64)
     username: str = Field(max_length=64)
     email: EmailStr
-    phone_number: PhoneNumber
+    phone_number: UkrainianPhoneNumber
     role: Role
     department: str
     workplace_id: Optional[int]

@@ -1,7 +1,5 @@
 from pydantic import BaseModel
 
-class SparePartCategoryFilters(BaseModel):
-    name__like: str | None = None
 
 class SparePartCategoryInfo(BaseModel):
     id: int

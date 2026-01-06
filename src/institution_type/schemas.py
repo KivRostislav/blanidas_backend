@@ -6,6 +6,6 @@ class InstitutionType(BaseDatabaseModel):
     __tablename__ = "institution_type"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column()
+    name: Mapped[str] = mapped_column(unique=True)
 
     institutions: Mapped[list["Institution"]] = relationship(back_populates="institution_type", lazy="noload")

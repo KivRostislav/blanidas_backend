@@ -36,7 +36,7 @@ class File(BaseDatabaseModel):
     __tablename__ = "file"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    file_path: Mapped[str] = mapped_column()
+    file_path: Mapped[str] = mapped_column(unique=True)
 
     repair_request_id: Mapped[int] = mapped_column(ForeignKey("repair_request.id", ondelete="CASCADE"))
     repair_request: Mapped["RepairRequest"] = relationship(back_populates="photos", lazy="noload")
@@ -48,10 +48,10 @@ class UsedSparePart(BaseDatabaseModel):
     quantity: Mapped[int] = mapped_column()
     note: Mapped[str] = mapped_column()
 
-    spare_part_id: Mapped[int | None] = mapped_column(ForeignKey("spare_part.id", ondelete="SET NULL"), nullable=True)
+    spare_part_id: Mapped[int] = mapped_column(ForeignKey("spare_part.id", ondelete="CASCADE"))
     spare_part: Mapped["SparePart"] = relationship(back_populates="used_spare_parts", lazy="noload")
 
-    institution_id: Mapped[int | None] = mapped_column(ForeignKey("institution.id", ondelete="SET NULL"), nullable=True)
+    institution_id: Mapped[int] = mapped_column(ForeignKey("institution.id", ondelete="CASCADE"))
     institution: Mapped["Institution"] = relationship(back_populates="used_spare_parts", lazy="noload")
 
     repair_request_id: Mapped[int] = mapped_column(ForeignKey("repair_request.id", ondelete="CASCADE"))
@@ -67,7 +67,7 @@ class RepairRequest(BaseDatabaseModel):
     created_at: Mapped[datetime] = mapped_column()
     completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
-    last_status: Mapped[RepairRequestStatus] = mapped_column(nullable=True) #sdfjdfslldfsdfsjdsfkdslfjsklfsjf;lskdjfd
+    last_status: Mapped[RepairRequestStatus] = mapped_column()
 
     manager_note: Mapped[str] = mapped_column()
     engineer_note: Mapped[str] = mapped_column()

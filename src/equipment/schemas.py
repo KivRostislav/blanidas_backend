@@ -12,10 +12,10 @@ class Equipment(BaseDatabaseModel):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     location: Mapped[str] = mapped_column()
-    serial_number: Mapped[str] = mapped_column()
+    serial_number: Mapped[str] = mapped_column(unique=True)
     installed: Mapped[date] = mapped_column(StringToDate)
 
-    institution_id: Mapped[int | None] = mapped_column(ForeignKey("institution.id", ondelete="SET NULL"), nullable=True)
+    institution_id: Mapped[int] = mapped_column(ForeignKey("institution.id", ondelete="CASCADE"))
     institution: Mapped["Institution"] = relationship(back_populates="equipment", lazy="noload")
 
     equipment_model_id: Mapped[int | None] = mapped_column(ForeignKey("equipment_model.id", ondelete="SET NULL"), nullable=True)

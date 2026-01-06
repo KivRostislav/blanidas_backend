@@ -1,7 +1,5 @@
 from pydantic import BaseModel
 
-class InstitutionTypeFilters(BaseModel):
-    name__like: str | None = None
 
 class InstitutionTypeInfo(BaseModel):
     id: int

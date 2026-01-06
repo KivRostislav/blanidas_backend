@@ -1,11 +1,15 @@
+import json
+
 from fastapi import APIRouter
-from fastapi.params import Depends
+from fastapi.params import Depends, Query
 
 from src.database import DatabaseSession
-from src.equipment_model.models import EquipmentModelInfo, EquipmentModelFilters, EquipmentModelCreate, EquipmentModelUpdate
+from src.decorators import domain_errors
+from src.equipment_model.errors import errors_map
+from src.equipment_model.models import EquipmentModelInfo, EquipmentModelCreate, EquipmentModelUpdate
 from src.equipment_model.services import EquipmentModelServices
 from src.pagination import PaginationResponse, Pagination
-
+from src.sorting import Sorting
 
 router = APIRouter(prefix="/equipment-models", tags=["Equipment Model"])
 services = EquipmentModelServices()
@@ -14,37 +18,27 @@ services = EquipmentModelServices()
 async def get_equipment_model_list_endpoint(
         database: DatabaseSession,
         pagination: Pagination = Depends(),
-        filters: EquipmentModelFilters = Depends(),
+        sorting: Sorting = Depends(),
+        filters: str | None = Query(None),
 ) -> PaginationResponse[EquipmentModelInfo]:
     return await services.paginate(
         database=database,
         pagination=pagination,
-        filters=filters.model_dump(exclude_none=True)
+        filters=json.loads(filters) if filters else None,
+        sorting=None if sorting.sort_by == "" else sorting,
     )
 
 @router.post("/", response_model=EquipmentModelInfo)
-async def create_equipment_model_endpoint(
-        model: EquipmentModelCreate,
-        database: DatabaseSession,
-) -> EquipmentModelInfo:
-    return await services.create(
-        data=model.model_dump(exclude_none=True),
-        database=database,
-        unique_fields=["name"]
-    )
+@domain_errors(errors_map)
+async def create_equipment_model_endpoint(model: EquipmentModelCreate, database: DatabaseSession) -> EquipmentModelInfo:
+    return await services.create(data=model.model_dump(exclude_none=True), database=database)
 
 @router.put("/", response_model=EquipmentModelInfo)
-async def update_equipment_model_endpoint(
-        model: EquipmentModelUpdate,
-        database: DatabaseSession,
-) -> EquipmentModelInfo:
-    return await services.update(
-        id_=model.id,
-        data=model.model_dump(exclude_none=True),
-        database=database,
-        unique_fields=["name"]
-    )
+@domain_errors(errors_map)
+async def update_equipment_model_endpoint(model: EquipmentModelUpdate, database: DatabaseSession) -> EquipmentModelInfo:
+    return await services.update(id_=model.id, data=model.model_dump(exclude_none=True), database=database)
 
-@router.delete("/{id_}", response_model=None)
-async def delete_equipment_model_endpoint(id_: int, database: DatabaseSession) -> None:
+@router.delete("/{id_}", response_model=int)
+@domain_errors(errors_map)
+async def delete_equipment_model_endpoint(id_: int, database: DatabaseSession) -> int:
     return await services.delete(id_=id_, database=database)

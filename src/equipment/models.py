@@ -27,19 +27,6 @@ class EquipmentInfo(BaseModel):
     def serialize_my_date(self, dt: date) -> str:
         return dt.strftime('%Y-%m-%d')
 
-class EquipmentFilters(BaseModel):
-    equipment_model__name__or__serial_number__ilike: str | None = None
-    institution_id__eq: int | None = None
-    equipment_category_id__eq: int | None = None
-    manufacturer_id__eq: int | None = None
-    status__eq: Status | None = None
-
-class EquipmentSortBy(str, Enum):
-    name = "equipment_model__name"
-    institution__name = "institution__name"
-    manufacturer__name = "manufacturer__name"
-    equipment_category__name = "equipment_category__name"
-
 class EquipmentCreate(BaseModel):
     location: str
     serial_number: str

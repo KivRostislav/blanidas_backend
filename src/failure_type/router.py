@@ -1,10 +1,15 @@
+import json
+
 from fastapi import APIRouter
-from fastapi.params import Depends
+from fastapi.params import Depends, Query
 
 from src.database import DatabaseSession
-from src.failure_type.models import FailureTypeInfo, FailureTypeFilters, FailureTypeCreate, FailureTypeUpdate
+from src.decorators import domain_errors
+from src.failure_type.errors import errors_map
+from src.failure_type.models import FailureTypeInfo, FailureTypeCreate, FailureTypeUpdate
 from src.failure_type.services import FailureTypeServices
 from src.pagination import Pagination, PaginationResponse
+from src.sorting import Sorting
 
 router = APIRouter(prefix="/failure-types", tags=["Failure Type"])
 services = FailureTypeServices()
@@ -13,37 +18,27 @@ services = FailureTypeServices()
 async def get_failure_type_list_endpoint(
         database: DatabaseSession,
         pagination: Pagination = Depends(),
-        filters: FailureTypeFilters = Depends(),
+        sorting: Sorting = Depends(),
+        filters: str | None = Query(None),
 ) -> PaginationResponse[FailureTypeInfo]:
     return await services.paginate(
         database=database,
         pagination=pagination,
-        filters=filters.model_dump(exclude_none=True)
+        filters=json.loads(filters) if filters else None,
+        sorting=None if sorting.sort_by == "" else sorting,
     )
 
 @router.post("/", response_model=FailureTypeInfo)
-async def create_failure_type_endpoint(
-        model: FailureTypeCreate,
-        database: DatabaseSession,
-) -> FailureTypeInfo:
-    return await services.create(
-        data=model.model_dump(exclude_none=True),
-        database=database,
-        unique_fields=["name"]
-    )
+@domain_errors(errors_map)
+async def create_failure_type_endpoint(model: FailureTypeCreate, database: DatabaseSession) -> FailureTypeInfo:
+    return await services.create(data=model.model_dump(exclude_none=True), database=database)
 
 @router.put("/", response_model=FailureTypeInfo)
-async def update_failure_type_endpoint(
-        model: FailureTypeUpdate,
-        database: DatabaseSession,
-) -> FailureTypeInfo:
-    return await services.update(
-        id_=model.id,
-        data=model.model_dump(exclude_none=True),
-        database=database,
-        unique_fields=["name"]
-    )
+@domain_errors(errors_map)
+async def update_failure_type_endpoint(model: FailureTypeUpdate, database: DatabaseSession) -> FailureTypeInfo:
+    return await services.update(id_=model.id, data=model.model_dump(exclude_none=True), database=database)
 
-@router.delete("/{id_}", response_model=None)
-async def delete_failure_type_endpoint(id_: int, database: DatabaseSession) -> None:
-    return await services.delete(id=id_, database=database)
+@router.delete("/{id_}", response_model=int)
+@domain_errors(errors_map)
+async def delete_failure_type_endpoint(id_: int, database: DatabaseSession) -> int:
+    return await services.delete(id_=id_, database=database)

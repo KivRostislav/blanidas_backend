@@ -1,10 +1,11 @@
-from typing import Generic, TypeVar, Type, Any
+from math import ceil
+from typing import Generic, TypeVar, Type
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sorting import Sorting
+from src.sorting import Sorting
 from src.equipment.models import EquipmentInfo
-from src.exceptions import NotFoundError
+from src.exceptions import NotFoundError, DomainError, ErrorCode
 from src.pagination import PaginationResponse, Pagination
 from src.repository import CRUDRepository
 
@@ -15,98 +16,49 @@ class GenericServices(Generic[ModelType, InfoType]):
         self.repo = repository
         self.return_type = return_type
 
-    async def create(
-            self,
-            data: dict,
-            database: AsyncSession,
-            unique_fields: list[str] | None = None,
-            relationship_fields: list[str] | None = None,
-            preloads: list[str] | None = None,
-    ) -> InfoType:
-        obj = await self.repo.create(
-            data=data,
-            database=database,
-            unique_fields=unique_fields,
-            relationship_fields=relationship_fields,
-            preloads=preloads,
-        )
-        return self.return_type.model_validate(obj.__dict__, from_attributes=True)
-
-    async def update(
-            self,
-            id_: int,
-            data: dict,
-            database: AsyncSession,
-            unique_fields: list[str] | None = None,
-            relationship_fields: list[str] | None = None,
-            overwrite_relationships: list[str] | None = None,
-            preloads: list[str] | None = None,
-    ) -> InfoType:
-        obj = await self.repo.update(
-            id_=id_,
-            data=data,
-            database=database,
-            unique_fields=unique_fields,
-            relationship_fields=relationship_fields,
-            overwrite_relationships=overwrite_relationships,
-            preloads=preloads,
-        )
-        return self.return_type.model_validate(obj.__dict__, from_attributes=True)
-
-    async def delete(
-            self,
-            id_: int,
-            database: AsyncSession,
-            relationship_fields: list[str] | None = None,
-    ) -> int:
-        return await self.repo.delete(
-            id_=id_,
-            database=database,
-            relationship_fields=relationship_fields
-        )
-
-    async def get(
-            self,
-            id_: int,
-            database: AsyncSession,
-            preloads: list[str] | None = None,
-    ) -> InfoType:
-        result = await self.repo.get(
-            filters={"id": id_},
-            database=database,
-            preloads=preloads
-        )
-
-        if not result:
-            raise NotFoundError(
-                model_name=EquipmentInfo.__name__,
-                record_id=id_
-            )
-
-        return self.return_type.model_validate(result.__dict__, from_attributes=True)
     async def paginate(
             self,
             database: AsyncSession,
             pagination: Pagination,
-            filters: dict[str, Any] | Any = None,
+            filters: str | None = None,
             preloads: list[str] | None = None,
             sorting: Sorting | None = None,
     ) -> PaginationResponse[InfoType]:
-        result = await self.repo.paginate(
+        result = await self.repo.fetch(
             database=database,
-            pagination=pagination,
+            limit=pagination.limit,
+            offset=pagination.offset,
             filters=filters,
             preloads=preloads,
             sorting=sorting,
         )
-        result["items"] = [self.return_type.model_validate(x.__dict__, from_attributes=True) for x in result["items"]]
-        return PaginationResponse.model_validate(result)
 
+        models = [self.return_type.model_validate(x.__dict__, from_attributes=True) for x in result[0]]
+        total_pages = max(1, ceil(result[1] / pagination.limit))
+        return PaginationResponse.model_validate({
+            "items": models,
+            "total": result[1],
+            "page": pagination.page,
+            "pages": total_pages,
+            "limit": pagination.limit,
+            "has_next": pagination.page < total_pages,
+            "has_prev": pagination.page > 1,
+        })
 
-    async def list(self, filters: dict[str, Any], database: AsyncSession, preloads: list[str] | None = None) -> list[InfoType]:
-        objs = await self.repo.list(
-            filters=filters,
-            database=database,
-            preloads=preloads
-        )
-        return [self.return_type.model_validate(x.__dict__, from_attributes=True) for x in objs]
+    async def create(self, data: dict, database: AsyncSession, preloads: list[str] | None = None) -> InfoType:
+        obj = await self.repo.create(data=data, database=database, preloads=preloads)
+        return self.return_type.model_validate(obj.__dict__, from_attributes=True)
+
+    async def update(self, id_: int, data: dict, database: AsyncSession, preloads: list[str] | None = None) -> InfoType:
+        obj = await self.repo.update(id_=id_, data=data, database=database, preloads=preloads)
+        return self.return_type.model_validate(obj.__dict__, from_attributes=True)
+
+    async def delete(self, id_: int, database: AsyncSession) -> int:
+        return await self.repo.delete(id_=id_, database=database)
+
+    async def get(self, id_: int, database: AsyncSession, preloads: list[str] | None = None) -> InfoType:
+        result = await self.repo.get(id_=id_, database=database, preloads=preloads)
+        if not result:
+            raise DomainError(code=ErrorCode.not_entity)
+
+        return self.return_type.model_validate(result.__dict__, from_attributes=True)

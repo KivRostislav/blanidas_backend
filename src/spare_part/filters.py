@@ -1,48 +1,46 @@
-from sqlalchemy import func, select, case
-from sqlalchemy.orm import aliased
+from sqlalchemy import func, select, case, Select
 
 from src.equipment_model.schemas import EquipmentModel
-from src.filter import apply_filters, ModelType
-from src.spare_part.models import SparePartState
-from src.spare_part.schemas import SparePart, SparePartLocationQuantity
+from src.filters import apply_filters, Filters, FilterRelatedFieldsMap, get_filter_value
+from src.institution.schemas import Institution
+from src.spare_part.models import StockStatus
+from src.spare_part.schemas import SparePart, Location
 
 
-def apply_spare_parts_filters(stmt, model: ModelType, filters: dict):
-    stmt = apply_filters(stmt, model, filters)
-    if "stock_status__eq" in filters:
-        locations = aliased(model.locations.property.mapper.class_)
+def apply_spare_parts_filters(stmt: Select, filters: Filters, related_fields: FilterRelatedFieldsMap) -> Select:
+    stmt = apply_filters(stmt, filters, related_fields)
 
-        qty_subq = (
+    compatible_model_id = get_filter_value(filters.get("compatible_model_id"), column=EquipmentModel.id)
+    institution_id = get_filter_value(filters.get("institution_id"), column=Institution.id)
+    stock_status = get_filter_value(filters.get("stock_status"), enum=StockStatus)
+
+    if stock_status is not None:
+        subquery = (
             select(
-                locations.spare_part_id.label("spare_part_id"),
-                func.sum(locations.quantity).label("total_quantity"),
+                Location.spare_part_id.label("spare_part_id"),
+                func.sum(Location.quantity).label("total_quantity"),
             )
-            .group_by(locations.spare_part_id)
+            .group_by(Location.spare_part_id)
             .subquery()
         )
 
-        total_qty = func.coalesce(qty_subq.c.total_quantity, 0)
+        total_quantity = func.coalesce(subquery.c.total_quantity, 0)
 
         stock_case = case(
-            (total_qty == 0, "out_of_stock"),
-            (total_qty <= model.min_quantity, "low_stock"),
-            else_="in_stock",
+            (total_quantity == 0, StockStatus.out_of_stock.value),
+            (total_quantity <= SparePart.min_quantity, StockStatus.low_stock.value),
+            else_=StockStatus.in_stock.value,
         )
 
         stmt = (
             stmt
-            .outerjoin(qty_subq, qty_subq.c.spare_part_id == model.id)
-            .where(stock_case == filters["stock_status__eq"])
+            .outerjoin(subquery, subquery.c.spare_part_id == SparePart.id)
+            .where(stock_case == stock_status)
         )
 
-    if "compatible_model_id__eq" in filters:
-        stmt = stmt.where(SparePart.compatible_models.any(EquipmentModel.id == filters["compatible_model_id__eq"]))
-
-    if "institution_id__eq" in filters:
-        stmt = stmt.where(
-            SparePart.locations.any(
-                SparePartLocationQuantity.institution_id == filters["institution_id__eq"]
-            )
-        )
+    if compatible_model_id is not None:
+        stmt = stmt.where(SparePart.compatible_models.any(EquipmentModel.id == compatible_model_id))
+    if institution_id is not None:
+        stmt = stmt.where(SparePart.locations.any(Location.institution_id == int(institution_id)))
 
     return stmt

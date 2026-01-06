@@ -1,9 +1,6 @@
 from pydantic import BaseModel
 
 
-class EquipmentCategoryFilters(BaseModel):
-    name__like: str | None = None
-
 class EquipmentCategoryInfo(BaseModel):
     id: int
     name: str

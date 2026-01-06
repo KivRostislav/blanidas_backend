@@ -12,14 +12,14 @@ def build_relation(model_type: Type, preload: Sequence[str]) -> list[Any]:
         parts = rel.split(".")
 
         attr = getattr(model_type, parts[0])
-        loader = selectinload(attr)
+        loader = joinedload(attr)
 
         current_loader = loader
         current_model = attr.property.mapper.class_
 
         for part in parts[1:]:
             sub_attr = getattr(current_model, part)
-            current_loader = current_loader.selectinload(sub_attr)
+            current_loader = current_loader.joinedload(sub_attr)
             current_model = sub_attr.property.mapper.class_
 
         options.append(current_loader)

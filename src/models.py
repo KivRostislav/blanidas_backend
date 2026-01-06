@@ -6,7 +6,7 @@ from sqlalchemy import TypeDecorator, Date
 class UkrainianPhoneNumber(PhoneNumber):
     default_region_code = 'UA'
     supported_regions = ['UA']
-    phone_format = 'NATIONAL'
+    phone_format = 'E164'
 
 class StringToDate(TypeDecorator):
     impl = Date

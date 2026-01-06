@@ -1,8 +1,12 @@
+import json
+
 from fastapi import APIRouter, Query
 from fastapi.params import Depends
 
-from sorting import SortOrder, Sorting
-from src.equipment.models import EquipmentFilters, EquipmentCreate, EquipmentUpdate, EquipmentInfo, EquipmentSortBy
+from src.decorators import domain_errors
+from src.equipment.errors import errors_map
+from src.sorting import SortOrder, Sorting
+from src.equipment.models import EquipmentCreate, EquipmentUpdate, EquipmentInfo
 from src.equipment.services import EquipmentServices
 from src.pagination import PaginationResponse, Pagination
 from src.database import DatabaseSession
@@ -14,15 +18,14 @@ services = EquipmentServices()
 async def get_equipment_list_endpoint(
         database: DatabaseSession,
         pagination: Pagination = Depends(),
-        filters: EquipmentFilters = Depends(),
-        sort_by: EquipmentSortBy | None = Query(None),
-        sort_order: SortOrder = Query(SortOrder.ascending),
+        sorting: Sorting = Depends(),
+        filters: str | None = Query(None),
 ) -> PaginationResponse[EquipmentInfo]:
     return await services.paginate(
         database=database,
         pagination=pagination,
-        sorting=Sorting(order=sort_order, order_by=sort_by) if sort_by else None,
-        filters=filters.model_dump(exclude_none=True),
+        filters=json.loads(filters) if filters else None,
+        sorting=None if sorting.sort_by == "" else sorting,
         preloads=[
             "equipment_model",
             "equipment_category",
@@ -33,6 +36,7 @@ async def get_equipment_list_endpoint(
     )
 
 @router.get("/{id_}", response_model=EquipmentInfo)
+@domain_errors(errors_map)
 async def get_equipment_endpoint(id_: int, database: DatabaseSession) -> EquipmentInfo:
     return await services.get(
         id_=id_,
@@ -46,23 +50,12 @@ async def get_equipment_endpoint(id_: int, database: DatabaseSession) -> Equipme
         ]
     )
 
-# dsfdsfdsdfsfdsdfsdfd
 @router.post("/", response_model=EquipmentInfo)
-async def create_equipment_endpoint(
-        model: EquipmentCreate,
-        database: DatabaseSession,
-) -> EquipmentInfo:
+@domain_errors(errors_map)
+async def create_equipment_endpoint(model: EquipmentCreate, database: DatabaseSession) -> EquipmentInfo:
     return await services.create(
         data=model.model_dump(exclude_none=True),
         database=database,
-        unique_fields=["name", "serial_number"],
-        relationship_fields=[
-            "equipment_model",
-            "equipment_category",
-            "manufacturer",
-            "institution",
-            "institution.institution_type",
-        ],
         preloads=[
             "equipment_model",
             "equipment_category",
@@ -73,22 +66,12 @@ async def create_equipment_endpoint(
     )
 
 @router.put("/", response_model=EquipmentInfo)
-async def update_equipment_endpoint(
-        model: EquipmentUpdate,
-        database: DatabaseSession,
-) -> EquipmentInfo:
+@domain_errors(errors_map)
+async def update_equipment_endpoint(model: EquipmentUpdate, database: DatabaseSession) -> EquipmentInfo:
     return await services.update(
         id_=model.id,
         data=model.model_dump(exclude_none=True),
         database=database,
-        unique_fields=["name", "serial_number"],
-        relationship_fields=[
-            "equipment_model",
-            "equipment_category",
-            "manufacturer",
-            "institution",
-            "institution.institution_type",
-        ],
         preloads=[
             "equipment_model",
             "equipment_category",
@@ -98,6 +81,7 @@ async def update_equipment_endpoint(
         ]
     )
 
-@router.delete("/{id_}", response_model=None)
-async def delete_equipment_endpoint(id_: int, database: DatabaseSession) -> None:
+@router.delete("/{id_}", response_model=int)
+@domain_errors(errors_map)
+async def delete_equipment_endpoint(id_: int, database: DatabaseSession) -> int:
     return await services.delete(id_=id_, database=database)

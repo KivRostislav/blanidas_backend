@@ -1,12 +1,19 @@
+import json
+from typing import Annotated
+
 from fastapi import APIRouter, UploadFile, BackgroundTasks, Query
 from fastapi.params import Depends, Form, File
 
-from sorting import SortOrder, Sorting
+from src.auth.schemas import Role
+from src.decorators import domain_errors
+from src.repair_request.errors import error_map
+from src.repair_request.schemas import Urgency
+from src.sorting import SortOrder, Sorting
 from src.mailer.dependencies import MailerServiceDep
 from src.pagination import PaginationResponse, Pagination
-from src.repair_request.models import RepairRequestInfo, RepairRequestFilters, RepairRequestCreate, RepairRequestUpdate, RepairRequestSortBy
+from src.repair_request.models import RepairRequestInfo, RepairRequestCreate, RepairRequestUpdate
 from src.database import DatabaseSession
-from src.repair_request.schemas import Urgency
+from src.auth.dependencies import allowed
 from src.repair_request.services import RepairRequestServices
 
 from src.config import get_settings
@@ -22,16 +29,16 @@ services = RepairRequestServices(
 @router.get("/", response_model=PaginationResponse[RepairRequestInfo])
 async def get_repair_request_list_endpoint(
         database: DatabaseSession,
+        _: Annotated[None, Depends(allowed())],
         pagination: Pagination = Depends(),
-        filters: RepairRequestFilters = Depends(),
-        sort_by: RepairRequestSortBy | None = Query(None),
-        sort_order: SortOrder = Query(SortOrder.ascending),
+        sorting: Sorting = Depends(),
+        filters: str | None = Query(None),
 ) -> PaginationResponse[RepairRequestInfo]:
     return await services.paginate(
         database=database,
         pagination=pagination,
-        sorting=Sorting(order=sort_order, order_by=sort_by) if sort_by else None,
-        filters=filters.model_dump(exclude_none=True),
+        filters=json.loads(filters) if filters else None,
+        sorting=None if sorting.sort_by == "" else sorting,
         preloads=[
             "equipment",
             "equipment.institution",
@@ -48,10 +55,10 @@ async def get_repair_request_list_endpoint(
     )
 
 @router.get("/{id_}", response_model=RepairRequestInfo)
-async def get_repair_request_endpoint(id_: int, database: DatabaseSession) -> RepairRequestInfo:
+async def get_repair_request_endpoint(id_: int, database: DatabaseSession, _: Annotated[None, Depends(allowed())]) -> RepairRequestInfo:
     return await services.get(
+        id_=id_,
         database=database,
-        filters={"id": id_},
         preloads=[
             "equipment",
             "equipment.institution",
@@ -68,6 +75,7 @@ async def get_repair_request_endpoint(id_: int, database: DatabaseSession) -> Re
     )
 
 @router.post("/", response_model=RepairRequestInfo)
+@domain_errors(error_map)
 async def create_repair_request_endpoint(
         database: DatabaseSession,
         background_tasks: BackgroundTasks,
@@ -104,20 +112,12 @@ async def create_repair_request_endpoint(
 
 
 @router.put("/", response_model=RepairRequestInfo)
-async def update_repair_request_endpoint(
-        model: RepairRequestUpdate,
-        database: DatabaseSession,
-) -> RepairRequestInfo:
+@domain_errors(error_map)
+async def update_repair_request_endpoint(model: RepairRequestUpdate, database: DatabaseSession, _: Annotated[None, Depends(allowed())]) -> RepairRequestInfo:
     return await services.update(
         id_=model.id,
-        data=model.model_dump(exclude_none=True),
         database=database,
-        relationship_fields=[
-            "failure_types",
-            "used_spare_parts",
-            "status_history",
-        ],
-        overwrite_relationships=["failure_types", "used_spare_parts"],
+        data=model.model_dump(exclude_none=True),
         preloads=[
             "failure_types",
             "used_spare_parts",
@@ -131,20 +131,13 @@ async def update_repair_request_endpoint(
         ]
     )
 
-@router.delete("/{id_}", response_model=None)
+@router.delete("/{id_}", response_model=int)
+@domain_errors(error_map)
 async def delete_repair_request_endpoint(
         id_: int,
         database: DatabaseSession,
-        background_tasks: BackgroundTasks
-) -> None:
-    return await services.delete(
-        id_=id_,
-        database=database,
-        relationship_fields=[
-            "failure_types",
-            "used_spare_parts",
-            "status_history",
-        ],
-        background_tasks=background_tasks,
-    )
+        background_tasks: BackgroundTasks,
+        _: Annotated[None, Depends(allowed(role=Role.manager))]
+) -> int:
+    return await services.delete(id_=id_, database=database, background_tasks=background_tasks)
 

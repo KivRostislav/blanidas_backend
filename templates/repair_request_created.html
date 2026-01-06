@@ -6,7 +6,7 @@
 
 <div style="background:#f4f4f4; padding: 10px; border-radius: 6px;">
     <p><strong>Опис проблеми:</strong> {{ repair_request_issue }}</p>
-    <p><strong>Рівень терміновості:</strong> {{ repair_request_urgency }}</p>
+    <p><strong>Рівень терміновості:</strong>{{ "Звичайна" if repair_request_urgency == "non_critical" else "Критична" }}</p>
 </div>
 
 

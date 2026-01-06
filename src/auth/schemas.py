@@ -11,13 +11,6 @@ from src.institution.schemas import Institution
 from src.repair_request.schemas import RepairRequestStatusRecord
 
 
-def merge_enums(name: str, *enums: type[Enum]):
-    values = {}
-    for enum in enums:
-        for item in enum:
-            values[item.name] = item.value
-    return Enum(name, values)
-
 class Role(str, Enum):
     engineer = "engineer"
     manager = "manager"
@@ -32,8 +25,8 @@ class User(BaseDatabaseModel):
     phone_number: Mapped[str] = mapped_column()
     role: Mapped[Role] = mapped_column()
 
-    workplace_id: Mapped[Optional[int]] = mapped_column(ForeignKey("institution.id", ondelete="SET NULL"), nullable=True)
-    workplace: Mapped[Optional["Institution"]] = relationship(back_populates="users", lazy="noload")
+    workplace_id: Mapped[int | None] = mapped_column(ForeignKey("institution.id", ondelete="SET NULL"), nullable=True)
+    workplace: Mapped["Institution | None"] = relationship(back_populates="users", lazy="noload")
 
     department: Mapped[str] = mapped_column()
     hire_at: Mapped[date] = mapped_column()

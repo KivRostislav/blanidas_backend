@@ -1,226 +1,164 @@
 from math import ceil
 
-from sqlalchemy import select, inspect, func
-from sqlalchemy.exc import NoForeignKeysError
+from sqlalchemy import select, inspect, func, update, delete, insert, distinct
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, selectinload, contains_eager
+from sqlalchemy.orm import joinedload, contains_eager
 
-from sorting import Sorting, SortOrder
-from src.equipment_model.schemas import EquipmentModel
-from src.exceptions import NotFoundError
+from src.decorators import integrity_errors
+from src.sorting import Sorting, SortOrder, apply_sorting_wrapper, SortingRelatedField
+from src.exceptions import DomainError, ErrorCode
 from src.institution.schemas import Institution
-from src.pagination import Pagination
 from src.repository import CRUDRepository
 from src.spare_part.filters import apply_spare_parts_filters
 from src.spare_part.models import SparePartCreate, SparePartUpdate
-from src.spare_part.schemas import SparePart, SparePartLocationQuantity
+from src.spare_part.schemas import SparePart, EquipmentModelSparePart, Location
 from src.spare_part.sorting import apply_spare_parts_sorting
-from src.utils import validate_relationships, build_relation
+from src.utils import build_relation
+from src.filters import Filters, apply_filters_wrapper, FilterRelatedField
 
+filter_related_fields_map = {
+    "name": FilterRelatedField(join=None, column=SparePart.name, use_exists=False),
+    "spare_part_category_id": FilterRelatedField(join=None, column=SparePart.spare_part_category_id, use_exists=False),
+    "compatible_model_id": None,
+    "institution_id": None,
+    "stock_status": None,
+}
+
+sorting_related_fields_map = {
+    "name": SortingRelatedField(join=None, column=SparePart.name),
+    "quantity": None,
+    "stock_status": None,
+}
 
 class SparePartRepository(CRUDRepository[SparePart]):
     def __init__(self):
         super().__init__(
             SparePart,
-            filter_callback=apply_spare_parts_filters,
-            sorting_callback=apply_spare_parts_sorting
+            filter_callback=apply_filters_wrapper(apply_spare_parts_filters, filter_related_fields_map),
+            sorting_callback=apply_sorting_wrapper(apply_spare_parts_sorting, sorting_related_fields_map),
         )
 
-    async def paginate(
+    async def fetch(
             self,
             database: AsyncSession,
-            pagination: Pagination,
-            filters: dict | None = None,
+            filters: Filters | None = None,
             preloads: list[str] | None = None,
             sorting: Sorting | None = None,
-    ) -> dict:
-        preloads_mapper = inspect(SparePart).relationships.items()
-        preloads_mapper.remove(list(filter(lambda x: x[0] == "locations", preloads_mapper))[0])
-        filters = filters if filters else {}
+            offset: int | None = None,
+            limit: int | None = None,
+    ) -> tuple[list[SparePart], int]:
+        filters = filters or {}
 
-        stmt = select(self.model)
-        stmt = self.filter_callback(stmt, self.model, filters)
-
-        if sorting:
-            stmt = self.sorting_callback(stmt, self.model, sorting.order_by, sorting.order == SortOrder.descending)
-
-        if preloads:
-            options = build_relation(self.model, [x[0] for x in preloads_mapper])
-            stmt = stmt.options(*options)
-
-        stmt = (stmt.join(SparePart.locations, isouter=True)
-            .join(SparePartLocationQuantity.institution, isouter=True)
+        stmt = (
+            select(SparePart)
+            .join(SparePart.supplier, isouter=True)
+            .join(SparePart.spare_part_category, isouter=True)
+            .join(SparePart.manufacturer, isouter=True)
+            .join(SparePart.compatible_models, isouter=True)
+            .join(SparePart.locations, isouter=True)
+            .join(Location.institution, isouter=True)
+            .join(Institution.institution_type, isouter=True)
             .options(
+                contains_eager(SparePart.supplier),
+                contains_eager(SparePart.spare_part_category),
+                contains_eager(SparePart.manufacturer),
+                contains_eager(SparePart.compatible_models),
                 contains_eager(SparePart.locations)
-                .contains_eager(SparePartLocationQuantity.institution)
+                .contains_eager(Location.institution)
+                .contains_eager(Institution.institution_type),
             )
+
             .order_by(Institution.name)
         )
 
-        count_stmt = select(func.count(self.model.id)).select_from(self.model)
+        stmt = self.filter_callback(stmt, filters)
+
+        if sorting:
+            stmt = self.sorting_callback(stmt, sorting)
+
+        count_stmt = select(func.count(distinct(SparePart.id))).select_from(SparePart)
         if filters:
-            count_stmt = self.filter_callback(count_stmt, self.model, filters)
+            count_stmt = self.filter_callback(count_stmt, filters)
 
         total = (await database.execute(count_stmt)).scalar() or 0
 
-        if pagination.limit >= 0:
-            stmt = stmt.offset(pagination.offset).limit(pagination.limit)
+        if limit is not None:
+            stmt = stmt.offset(offset or 0).limit(limit)
 
         result = await database.execute(stmt)
         items = result.unique().scalars().all()
 
-        total_pages = max(1, ceil(total / pagination.limit))
-        return {
-            "items": items,
-            "total": total,
-            "page": pagination.page,
-            "pages": total_pages,
-            "limit": pagination.limit,
-            "has_next": pagination.page < total_pages,
-            "has_prev": pagination.page > 1,
-        }
+        return list(items), total
 
-
-    async def create(
-            self,
-            data: dict,
-            database: AsyncSession,
-            unique_fields: list[str] | None = None,
-            relationship_fields: list[str] | None = None,
-            preloads: list[str] | None = None,
-    ) -> SparePart:
-        relationship_fields = relationship_fields or []
-        preloads = preloads or []
+    @integrity_errors()
+    async def create(self, data: dict, database: AsyncSession, preloads: list[str] | None = None) -> SparePart:
         data_model = SparePartCreate.model_validate(data)
-
-        if not validate_relationships(SparePart, data, database, relationship_fields):
-            raise NoForeignKeysError()
-
-        del data["locations"]
         del data["compatible_models_ids"]
 
-        spare_part_obj = SparePart(**data)
-        stmt = select(EquipmentModel).where(EquipmentModel.id.in_(data_model.compatible_models_ids))
-        compatible_model_objs = (await database.execute(stmt)).scalars().all()
+        row_id = (await database.execute(insert(SparePart).values(data).returning(SparePart.id))).scalar()
 
-        for compatible_model_obj in compatible_model_objs:
-            spare_part_obj.compatible_models.append(compatible_model_obj)
-
-        database.add(spare_part_obj)
-        await database.flush()
-
-        for location in data_model.locations:
-            database.add(SparePartLocationQuantity(
-                quantity=location.quantity,
-                institution_id=location.institution_id,
-                spare_part_id=spare_part_obj.id,
-            ))
+        for compatible_model_id in data_model.compatible_models_ids:
+            await database.execute(insert(EquipmentModelSparePart).values({
+                "equipment_model_id": compatible_model_id,
+                "spare_part_id": row_id,
+            }))
 
         await database.commit()
 
         options = build_relation(SparePart, preloads)
-        stmt = (select(SparePart).options(*options)
-                .where(SparePart.id == spare_part_obj.id)
-                .execution_options(populate_existing=True))
+        stmt = select(SparePart).options(*options).where(SparePart.id == row_id)
         result = await database.execute(stmt)
         return result.scalars().first()
 
-    async def update(
-            self,
-            id_: int,
-            data: dict,
-            database: AsyncSession,
-            unique_fields: list[str] | None = None,
-            relationship_fields: list[str] | None = None,
-            overwrite_relationships: list[str] | None = None,
-            preloads: list[str] | None = None,
-    ) -> SparePart:
-        relationship_fields = relationship_fields or []
-        overwrite_relationships = overwrite_relationships or []
-        preloads = preloads or []
-
+    @integrity_errors()
+    async def update(self, id_: int, data: dict, database: AsyncSession, preloads: list[str] | None = None) -> SparePart:
         data_model = SparePartUpdate.model_validate(data)
 
-        options = [
-            joinedload(SparePart.compatible_models),
-            joinedload(SparePart.locations)
-        ]
-
-        stmt = select(SparePart).options(*options).where(SparePart.id == id_)
-        spare_part_obj = (await database.execute(stmt)).scalars().first()
-
-        if not spare_part_obj:
-            raise NotFoundError()
-
-        if not validate_relationships(SparePart, data, database, relationship_fields):
-            raise NoForeignKeysError()
-
-        for field, value in data_model.model_dump(exclude={"locations", "compatible_models_ids"}, exclude_unset=True).items():
-            setattr(spare_part_obj, field, value)
+        fields_to_update = data_model.model_dump(exclude={"locations", "compatible_models_ids"}, exclude_unset=True)
+        rows = await database.execute(update(SparePart).where(SparePart.id == id_).values(fields_to_update))
+        if rows.rowcount == 0:
+            raise DomainError(ErrorCode.not_entity)
 
         if data_model.compatible_models_ids is not None:
-            stmt = select(EquipmentModel).where(EquipmentModel.id.in_(data_model.compatible_models_ids))
-            compatible_model_objs = (await database.execute(stmt)).scalars().all()
-            spare_part_obj.compatible_models.clear()
-            await database.flush()
+            await database.execute(delete(EquipmentModelSparePart).where(EquipmentModelSparePart.spare_part_id == id_))
+            for compatible_model_id in data_model.compatible_models_ids:
+                await database.execute(insert(EquipmentModelSparePart).values({
+                    "equipment_model_id": compatible_model_id,
+                    "spare_part_id": id_,
+                }))
 
-            for compatible_model_obj in compatible_model_objs:
-                spare_part_obj.compatible_models.append(compatible_model_obj)
-
-        if "locations" in overwrite_relationships and data_model.locations is not None:
-            incoming_ids = {
-                loc.institution_id
-                for loc in data_model.locations
-            }
-            for location in spare_part_obj.locations:
-                if location.institution_id not in incoming_ids:
-                    await database.delete(location)
-
-            existing_locations = {
-                loc.institution_id: loc
-                for loc in spare_part_obj.locations
-            }
-
+        if data_model.locations is not None:
+            await database.execute(delete(Location).where(Location.spare_part_id == id_))
             for location in data_model.locations:
-                existing = existing_locations.get(location.institution_id)
-
-                if location.quantity <= 0:
-                    if existing:
-                        await database.delete(existing)
-                    continue
-
-                if existing:
-                    existing.quantity = location.quantity
-                else:
-                    database.add(
-                        SparePartLocationQuantity(
-                            quantity=location.quantity,
-                            institution_id=location.institution_id,
-                            spare_part_id=spare_part_obj.id,
-                        )
-                    )
+                await database.execute(insert(Location).values({
+                    "quantity": location.quantity,
+                    "institution_id": location.institution_id,
+                    "spare_part_id": id_,
+                }))
 
         await database.commit()
 
-        if "locations" in preloads:
-            preloads.remove("locations")
-
-        options = build_relation(SparePart, preloads)
-        stmt = (stmt
-                .join(SparePart.locations, isouter=True)
-                .join(SparePartLocationQuantity.institution, isouter=True)
-                .options(
-                    contains_eager(SparePart.locations)
-                    .contains_eager(SparePartLocationQuantity.institution)
-                )
-                .order_by(Institution.name)
-        )
-
         stmt = (
             select(SparePart)
-            .options(*options)
-            .where(SparePart.id == spare_part_obj.id)
-            .execution_options(populate_existing=True)
+            .join(SparePart.supplier, isouter=True)
+            .join(SparePart.spare_part_category, isouter=True)
+            .join(SparePart.manufacturer, isouter=True)
+            .join(SparePart.compatible_models, isouter=True)
+            .join(SparePart.locations, isouter=True)
+            .join(Location.institution, isouter=True)
+            .join(Institution.institution_type, isouter=True)
+            .options(
+                contains_eager(SparePart.supplier),
+                contains_eager(SparePart.spare_part_category),
+                contains_eager(SparePart.manufacturer),
+                contains_eager(SparePart.compatible_models),
+                contains_eager(SparePart.locations)
+                .contains_eager(Location.institution)
+                .contains_eager(Institution.institution_type),
+            )
+
+            .order_by(Institution.name)
+            .where(SparePart.id == id_)
         )
         result = await database.execute(stmt)
         return result.scalars().first()

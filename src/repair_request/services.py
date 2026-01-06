@@ -1,21 +1,22 @@
 import uuid
 import os
-from datetime import datetime
+from math import ceil
 from typing import Any
 
 import magic
 
-from fastapi import UploadFile, HTTPException, status, BackgroundTasks
+from fastapi import UploadFile, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sorting import Sorting
+from src.exceptions import DomainError, ErrorCode
+from src.sorting import Sorting
 from src.auth.schemas import User
 from src.event import emit, EventTypes
 from src.mailer.smtp import MailerService
 from src.mailer.models import RepairRequestCreatedMessagePayload
 from src.pagination import Pagination, PaginationResponse
 from src.repair_request.models import RepairRequestInfo
-from src.repair_request.repository import RepairRequestRepository
+from src.repair_request.repository import RepairRequestRepository, FileRepository
 from src.repair_request.schemas import RepairRequest, File
 from src.repository import CRUDRepository
 from src.services import GenericServices
@@ -28,10 +29,9 @@ def form_url_to_file(static_dir: str, filename: str) -> str:
 
 class RepairRequestServices(GenericServices[RepairRequest, RepairRequestInfo]):
     def __init__(self, proxy_url_to_static_files_dir: str, static_files_dir: str):
-        super().__init__(CRUDRepository(RepairRequest), RepairRequestInfo)
-        self.repo = RepairRequestRepository()
-        self.file_repo = CRUDRepository(File)
+        super().__init__(RepairRequestRepository(), RepairRequestInfo)
         self.auth_repo = CRUDRepository(User)
+        self.file_repo = FileRepository()
 
         self.static_files_dir = static_files_dir
         self.proxy_url_to_static_files_dir = proxy_url_to_static_files_dir
@@ -44,19 +44,30 @@ class RepairRequestServices(GenericServices[RepairRequest, RepairRequestInfo]):
             sorting: Sorting | None = None,
             preloads: list[str] | None = None,
     ) -> PaginationResponse[RepairRequestInfo]:
-        result = await self.repo.paginate(
+        result = await self.repo.fetch(
             database=database,
-            pagination=pagination,
+            limit=pagination.limit,
+            offset=pagination.offset,
             filters=filters,
             sorting=sorting,
             preloads=preloads,
         )
-        result["items"] = [self.return_type.model_validate(x.__dict__, from_attributes=True) for x in result["items"]]
-        for item in result["items"]:
-            for photo in item.photos:
+
+        models = [self.return_type.model_validate(x.__dict__, from_attributes=True) for x in result[0]]
+        for model in models:
+            for photo in model.photos:
                 photo.file_path = form_url_to_file(self.proxy_url_to_static_files_dir, photo.file_path)
 
-        return PaginationResponse.model_validate(result)
+        total_pages = max(1, ceil(result[1] / pagination.limit))
+        return PaginationResponse.model_validate({
+            "items": models,
+            "total": result[1],
+            "page": pagination.page,
+            "pages": total_pages,
+            "limit": pagination.limit,
+            "has_next": pagination.page < total_pages,
+            "has_prev": pagination.page > 1,
+        })
 
     async def create(
             self,
@@ -65,8 +76,6 @@ class RepairRequestServices(GenericServices[RepairRequest, RepairRequestInfo]):
             mailer: MailerService | None = None,
             background_tasks: BackgroundTasks | None = None,
             photos: list[UploadFile] | None = None,
-            unique_fields: list[str] | None = None,
-            relationship_fields: list[str] | None = None,
             preloads: list[str] | None = None,
     ) -> RepairRequestInfo:
         photos = photos if photos else []
@@ -86,10 +95,7 @@ class RepairRequestServices(GenericServices[RepairRequest, RepairRequestInfo]):
                         raise
                     new_files[f"{uuid.uuid4()}.{ext}"] = content
             except Exception:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Unsupported file type"
-                )
+                raise DomainError(code=ErrorCode.unsupported_file_type, field="photos")
 
             saved_files = []
             try:
@@ -108,8 +114,6 @@ class RepairRequestServices(GenericServices[RepairRequest, RepairRequestInfo]):
             data=data,
             database=database,
             preloads=preloads,
-            unique_fields=unique_fields,
-            relationship_fields=relationship_fields,
             validate_photos_callback=validate_photos,
         )
 
@@ -118,10 +122,10 @@ class RepairRequestServices(GenericServices[RepairRequest, RepairRequestInfo]):
             photo.file_path = form_url_to_file(self.proxy_url_to_static_files_dir, photo.file_path)
 
         if background_tasks and mailer:
-            receivers = await self.auth_repo.list(
+            receivers = (await self.auth_repo.fetch(
                 database=database,
-                filters={"receive_repair_request_created_notification": True}
-            )
+                filters={"receive_repair_request_created_notification": "true"}
+            ))[0]
             for receiver in receivers:
                 await emit(
                     event_name=EventTypes.repair_request_created.name,
@@ -154,9 +158,6 @@ class RepairRequestServices(GenericServices[RepairRequest, RepairRequestInfo]):
             id_=id_,
             data=data,
             database=database,
-            unique_fields=unique_fields,
-            relationship_fields=relationship_fields,
-            overwrite_relationships=overwrite_relationships,
             preloads=preloads,
         )
 
@@ -171,27 +172,21 @@ class RepairRequestServices(GenericServices[RepairRequest, RepairRequestInfo]):
             database: AsyncSession,
             relationship_fields: list[str] | None = None,
             background_tasks: BackgroundTasks | None = None,
-    ) -> None:
-        photos = await self.file_repo.list(filters={"repair_request_id": id_}, database=database)
+    ) -> int:
+        photos = await self.file_repo.get_by_repair_request_id(id_, database=database)
         for photo in photos:
             path = form_url_to_file(self.static_files_dir, photo.file_path)
             if background_tasks:
                 background_tasks.add_task(os.remove, path)
                 continue
             os.remove(path)
-        await self.repo.delete(id_=id_, database=database, relationship_fields=relationship_fields)
+        return await self.repo.delete(id_=id_, database=database)
 
-    async def get(
-            self,
-            database: AsyncSession,
-            filters: dict[str, Any] | Any = None,
-            preloads: list[str] | None = None,
-    ) -> RepairRequestInfo:
-        result = await self.repo.get(
-            database=database,
-            filters=filters,
-            preloads=preloads
-        )
+    async def get(self, id_: int, database: AsyncSession, preloads: list[str] | None = None) -> RepairRequestInfo:
+        result = await self.repo.get(id_=id_, database=database, preloads=preloads)
+        if result is None:
+            raise DomainError(code=ErrorCode.not_entity)
+
         for photo in result.photos:
             photo.file_path = form_url_to_file(self.proxy_url_to_static_files_dir, str(photo.file_path))
 

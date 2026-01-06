@@ -11,21 +11,6 @@ from src.repair_request.schemas import Urgency, RepairRequestStatus
 from src.spare_part.models import SparePartInfo
 
 
-class RepairRequestFilters(BaseModel):
-    id__ne: int | None = None
-    equipment_id__eq: int | None = None
-    equipment__serial_number__or__equipment__equipment_model__name__ilike: str | None = None
-    equipment__equipment_category_id__eq: int | None = None
-    equipment__institution_id__eq: int | None = None
-    urgency__eq: Urgency | None = None
-    status__eq: RepairRequestStatus | None = None
-
-class RepairRequestSortBy(str, Enum):
-    urgency = "urgency"
-    created_at = "created_at"
-    equipment__equipment_model__name = "equipment__equipment_model__name"
-    status = "status"
-
 class RepairRequestStatusRecordInfo(BaseModel):
     id: int
     created_at: datetime
@@ -63,6 +48,8 @@ class RepairRequestInfo(BaseModel):
     engineer_note: str | None
     created_at: datetime
     completed_at: datetime | None
+    last_status: RepairRequestStatus
+
 
     photos: list[FileInfo]
     failure_types: list[FailureTypeInfo]
@@ -79,6 +66,7 @@ class RepairRequestUpdate(BaseModel):
     id: int
     manager_note: str | None = None
     engineer_note: str | None = None
+    assigned_engineer_id: str | None = None
 
     failure_types_ids: list[int] | None = None
     used_spare_parts: list[UsedSparePartCreate] | None = None

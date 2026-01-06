@@ -9,6 +9,59 @@ class StatisticsTimeStep(str, Enum):
     week = "week"
     month = "month"
 
+class KPIChange(str, Enum):
+    up = "up"
+    down = "down"
+    no_change = "no_change"
+
+class KPI(BaseModel):
+    title: str
+    value: str
+    change: KPIChange
+    change_percent: float
+
+class CategoricalChartDataItem(BaseModel):
+    model_id: int
+    label: str
+    value: int
+
+class TimelinePoint(BaseModel):
+    period: str
+    count: int
+
+class TimeFrame(BaseModel):
+    from_date: datetime
+    to_date: datetime
+    step: StatisticsTimeStep
+
+class EquipmentBreakdownItem(BaseModel):
+    serial_number: str
+    model_name: str
+    center_name: str
+    breakdown_count: int
+    avg_repair_seconds: float
+
+class StatisticsResponse(BaseModel):
+    time_frame: TimeFrame
+
+    total_breakdown_count_kpi: KPI
+    average_repair_time_kpi: KPI
+    institutions_kpi: KPI
+    used_spare_parts_kpi: KPI
+
+    center_breakdown: list[CategoricalChartDataItem]
+    time_dynamics: list[TimelinePoint]
+    failure_types: list[CategoricalChartDataItem]
+
+    model_breakdown: list[CategoricalChartDataItem]
+    average_repair_time: list[CategoricalChartDataItem]
+
+    spare_part_categories: list[CategoricalChartDataItem]
+    used_spare_parts: list[CategoricalChartDataItem]
+
+    equipment_breakdown: list[EquipmentBreakdownItem]
+
+
 class CenterBreakdownItem(BaseModel):
     center_id: int
     center_name: str
@@ -48,26 +101,5 @@ class AvgRepairTimeItem(BaseModel):
 class AvgRepairTime(BaseModel):
     items: list[AvgRepairTimeItem]
 
-class EquipmentBreakdownItem(BaseModel):
-    serial_number: str
-    model_name: str
-    center_name: str
-    breakdown_count: int
-    avg_repair_seconds: float
-
 class EquipmentBreakdown(BaseModel):
     items: list[EquipmentBreakdownItem]
-
-class TimeFrame(BaseModel):
-    from_date: datetime
-    to_date: datetime
-    step: StatisticsTimeStep
-
-class StatisticsResponse(BaseModel):
-    time_frame: TimeFrame
-    center_breakdown: CenterBreakdown
-    failure_types: FailureTypes
-    model_breakdown: ModelBreakdown
-    time_dynamics: TimeDynamics
-    average_repair_time: AvgRepairTime
-    equipment_breakdown: EquipmentBreakdown

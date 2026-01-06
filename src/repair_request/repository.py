@@ -1,141 +1,128 @@
 from datetime import datetime
-from math import ceil
 from typing import Callable
 
-from sqlalchemy import select, and_, func
+from sqlalchemy import select, and_, update, delete, func
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from sorting import Sorting
 from src.auth.schemas import User
-from src.exceptions import NotFoundError, ForeignKeyNotFoundError
-from src.failure_type.schemas import FailureType
-from src.pagination import Pagination
+from src.decorators import integrity_errors
+from src.equipment.schemas import Equipment
+from src.equipment_category.schemas import EquipmentCategory
+from src.exceptions import NotFoundError, ForeignKeyNotFoundError, DomainError, ErrorCode
+from src.failure_type.schemas import FailureType, FailureTypeRepairRequest
+from src.filters import FilterRelatedField, apply_filters_wrapper
 from src.repair_request.filters import apply_repair_request_filters
 from src.repair_request.models import RepairRequestUpdate
-from src.repair_request.schemas import RepairRequest, RepairRequestStatus, File, RepairRequestStatusRecord, \
-    UsedSparePart
+from src.repair_request.schemas import RepairRequest, RepairRequestStatus, File, RepairRequestStatusRecord, UsedSparePart
 from src.repair_request.sorting import apply_repair_request_sorting
 from src.repository import CRUDRepository
-from src.spare_part.schemas import SparePartLocationQuantity
-from src.utils import build_relation, validate_relationships
+from src.sorting import SortingRelatedField, apply_sorting_wrapper
+from src.spare_part.schemas import Location
+from src.utils import build_relation
 
+
+filter_related_fields_map = {
+    "id": FilterRelatedField(join=None, column=RepairRequest.id, use_exists=False),
+    "equipment_id": FilterRelatedField(join=None, column=RepairRequest.equipment_id, use_exists=False),
+    "equipment_category_id": FilterRelatedField(join=None, column=Equipment.equipment_category_id, use_exists=True),
+    "equipment_institution_id": FilterRelatedField(join=None, column=Equipment.institution_id, use_exists=True),
+    "urgency": FilterRelatedField(join=None, column=RepairRequest.urgency, use_exists=True),
+    "status": FilterRelatedField(join=None, column=RepairRequest.last_status, use_exists=False),
+    "equipment_serial_number_or_equipment_equipment_model_name": None,
+}
+
+sorting_related_fields_map = {
+    "created_at": SortingRelatedField(join=None, column=RepairRequest.created_at),
+    "urgency": SortingRelatedField(join=None, column=RepairRequest.urgency),
+    "status": SortingRelatedField(join=None, column=RepairRequest.last_status),
+    "equipment_model_name": None,
+}
 
 class RepairRequestRepository(CRUDRepository[RepairRequest]):
     def __init__(self):
         super().__init__(
             RepairRequest,
-            apply_repair_request_filters,
-            apply_repair_request_sorting,
-        )
+            filter_callback=apply_filters_wrapper(apply_repair_request_filters, filter_related_fields_map),
+            sorting_callback=apply_sorting_wrapper(apply_repair_request_sorting, sorting_related_fields_map),
+       )
 
+    @integrity_errors()
     async def create(
             self,
             data: dict,
             database: AsyncSession,
-            unique_fields: list[str] | None = None,
-            relationship_fields: list[str] | None = None,
             preloads: list[str] | None = None,
             validate_photos_callback: Callable[[], list[str]] | None = None,
     ) -> RepairRequest:
-        if not validate_relationships(RepairRequest, data, database, ["equipment"]):
-            raise ForeignKeyNotFoundError()
 
-        data["created_at"] = datetime.now()
-        repair_request_obj = RepairRequest(
+        row_id = (await database.execute(insert(RepairRequest).values(
             **data,
             manager_note="",
             engineer_note="",
-        )
+            created_at=func.now(),
+            last_status=RepairRequestStatus.not_taken
+        ).returning(RepairRequest.id))).scalar()
 
-        database.add(repair_request_obj)
-        await database.flush()
-
-        status_history_obj = RepairRequestStatusRecord(
-            repair_request_id=repair_request_obj.id,
+        await database.execute(insert(RepairRequestStatusRecord).values(
+            repair_request_id=row_id,
             status=RepairRequestStatus.not_taken,
-            created_at=datetime.now(),
-            assigned_engineer=None,
-        )
-        database.add(status_history_obj)
+            created_at=func.now(),
+            assigned_engineer_id=None,
+        ))
 
-        new_filenames = validate_photos_callback()
-        file_objs = [File(
-            repair_request_id=repair_request_obj.id,
-            file_path=new_filename
-        ) for new_filename in new_filenames]
+        if validate_photos_callback:
+            new_filenames = validate_photos_callback()
+            for new_filename in new_filenames:
+                await database.execute(insert(File).values(repair_request_id=row_id, file_path=new_filename))
 
-        database.add_all(file_objs)
         await database.commit()
 
         options = build_relation(RepairRequest, preloads)
-        stmt = (select(RepairRequest)
-                .options(*options)
-                .where(RepairRequest.id == repair_request_obj.id)
-                .execution_options(populate_existing=True))
+        stmt = (select(RepairRequest).options(*options).where(RepairRequest.id == row_id))
         result = await database.execute(stmt)
         return result.scalars().first()
 
-    async def update(
-            self,
-            id_: int,
-            data: dict,
-            database: AsyncSession,
-            unique_fields: list[str] | None = None,
-            relationship_fields: list[str] | None = None,
-            overwrite_relationships: list[str] | None = None,
-            preloads: list[str] | None = None,
-    ) -> RepairRequest:
+    @integrity_errors()
+    async def update(self, id_: int, data: dict, database: AsyncSession, preloads: list[str] | None = None) -> RepairRequest:
         data_model = RepairRequestUpdate.model_validate(data)
 
-        options = [
-            joinedload(RepairRequest.status_history),
-            joinedload(RepairRequest.failure_types),
-            joinedload(RepairRequest.used_spare_parts)
-        ]
+        fields_to_update = data_model.model_dump(exclude={"status_history", "used_spare_parts", "failure_types_ids"}, exclude_unset=True)
+        result = await database.execute(
+            update(RepairRequest)
+            .where(RepairRequest.id == id_)
+            .values(fields_to_update)
+            .returning(RepairRequest.id)
+        )
 
-        stmt = select(RepairRequest).options(*options).where(RepairRequest.id == id_)
-        result = await database.execute(stmt)
-        obj = result.scalars().first()
+        if result.first() is None:
+            raise DomainError(code=ErrorCode.not_entity)
 
-        if not obj:
-            raise NotFoundError(self.model.__name__, id_)
-
-        if not await validate_relationships(self.model, data, database, ["failure_types"]):
-            raise ForeignKeyNotFoundError()
-
-        for field, value in data_model.model_dump(exclude={"status_history", "used_spare_parts"}, exclude_unset=True).items():
-            setattr(obj, field, value)
-
-        if data_model.failure_types_ids is not None:
-            failure_types = (await database.execute(
-                select(FailureType).where(FailureType.id.in_(data_model.failure_types_ids))
-            )).scalars().all()
-            obj.failure_types.clear()
-            await database.flush()
-            obj.failure_types.extend(failure_types)
+        if data_model.failure_types_ids:
+            await database.execute(delete(FailureTypeRepairRequest).where(FailureTypeRepairRequest.repair_request_id == id_))
+            for failure_type_id in data_model.failure_types_ids:
+                await database.execute(insert(FailureTypeRepairRequest).values(
+                    repair_request_id=id_,
+                    failure_type_id=failure_type_id,
+                ))
 
         if data_model.status_history:
-            assigned_engineer_id = data_model.status_history.assigned_engineer_id
-            if assigned_engineer_id:
-                responsible_user = (await database.execute(
-                    select(User).where(User.id == assigned_engineer_id)
-                )).scalars().first()
-                if not responsible_user:
-                    raise ForeignKeyNotFoundError()
-            status_history_obj = RepairRequestStatusRecord(
-                repair_request_id=obj.id,
-                created_at=datetime.now(),
-                assigned_engineer_id=assigned_engineer_id,
+            await database.execute(insert(RepairRequestStatusRecord).values(
+                repair_request_id=id_,
+                created_at=func.now(),
+                assigned_engineer_id=data_model.status_history.assigned_engineer_id,
                 status=data_model.status_history.status,
-            )
-            database.add(status_history_obj)
-
-            if data_model.status_history.status == RepairRequestStatus.finished:
-                obj.completed_at = datetime.now()
+            ))
+            completed_at = func.now() if data_model.status_history.status == RepairRequestStatus.finished else None
+            await database.execute(update(RepairRequest).where(RepairRequest.id == id_).values(
+                last_status=data_model.status_history.status,
+                completed_at=completed_at
+            ))
 
         if data_model.used_spare_parts is not None:
-            old_parts = {(usp.spare_part_id, usp.institution_id): usp for usp in obj.used_spare_parts}
+            used_spare_parts = (await database.execute(select(UsedSparePart).where(UsedSparePart.repair_request_id == id_))).scalars().all()
+            old_parts = {(usp.spare_part_id, usp.institution_id): usp for usp in used_spare_parts}
             new_parts = {(usp.spare_part_id, usp.institution_id): usp for usp in data_model.used_spare_parts}
 
             for key, old_usp in old_parts.items():
@@ -145,24 +132,21 @@ class RepairRequestRepository(CRUDRepository[RepairRequest]):
                 diff = old_qty - new_qty
 
                 if diff > 0:
-                    location = (await database.execute(
-                        select(SparePartLocationQuantity)
-                        .where(
-                            and_(
-                                SparePartLocationQuantity.spare_part_id == old_usp.spare_part_id,
-                                SparePartLocationQuantity.institution_id == old_usp.institution_id,
-                            )
-                        )
-                    )).scalars().first()
-                    if location:
-                        location.quantity += diff
-                    else:
-                        location = SparePartLocationQuantity(
-                            spare_part_id=spare_part_id,
-                            institution_id=institution_id,
-                            quantity=diff
-                        )
-                    database.add(location)
+                    stmt = insert(Location).values(
+                        spare_part_id=spare_part_id,
+                        institution_id=institution_id,
+                        quantity=diff
+                    ).on_conflict_do_update(
+                        index_elements=[
+                            Location.spare_part_id,
+                            Location.institution_id,
+                        ],
+                        set_={
+                            "quantity": Location.quantity + diff,
+                        }
+                    )
+                    await database.execute(stmt)
+
 
             for key, new_usp in new_parts.items():
                 spare_part_id, institution_id = key
@@ -170,50 +154,44 @@ class RepairRequestRepository(CRUDRepository[RepairRequest]):
                 diff = new_usp.quantity - old_qty
 
                 if diff > 0:
-                    location = (await database.execute(
-                        select(SparePartLocationQuantity)
-                        .where(
-                            and_(
-                                SparePartLocationQuantity.spare_part_id == new_usp.spare_part_id,
-                                SparePartLocationQuantity.institution_id == new_usp.institution_id,
-                            )
-                        )
-                    )).scalars().first()
-                    if not location:
-                        location = SparePartLocationQuantity(
-                            spare_part_id=spare_part_id,
-                            institution_id=institution_id,
-                            quantity=0
-                        )
-                    if location.quantity < diff:
-                        raise ValueError(f"Not enough details of spare part {spare_part_id} in institution {institution_id}")
-                    location.quantity -= diff
-                    if location.quantity <= 0:
-                        await database.delete(location)
-                    else:
-                        database.add(location)
+                    stmt = insert(Location).values(
+                        spare_part_id=spare_part_id,
+                        institution_id=institution_id,
+                        quantity=diff
+                    ).on_conflict_do_update(
+                        index_elements=[
+                            Location.spare_part_id,
+                            Location.institution_id,
+                        ],
+                        set_={
+                            "quantity": Location.quantity - diff,
+                        }
+                    ).returning(Location.id, Location.quantity)
+                    row = (await database.execute(stmt)).first()
+                    if row is not None and row.quantity == 0:
+                        await database.execute(delete(Location).where(Location.id == row.id))
 
-            obj.used_spare_parts.clear()
-            await database.flush()
+            await database.execute(delete(UsedSparePart).where(UsedSparePart.repair_request_id == id_))
             for usp in data_model.used_spare_parts:
-                used_part = UsedSparePart(
-                    repair_request_id=obj.id,
+                await database.execute(insert(UsedSparePart).values(
+                    repair_request_id=id_,
                     spare_part_id=usp.spare_part_id,
                     institution_id=usp.institution_id,
                     quantity=usp.quantity,
                     note=usp.note,
-                )
-                database.add(used_part)
+                ))
 
-        database.add(obj)
         await database.commit()
-        await database.refresh(obj)
 
-        if preloads:
-            options = build_relation(RepairRequest, preloads)
-            stmt = select(RepairRequest).options(*options).where(RepairRequest.id == obj.id)
-            result = await database.execute(stmt)
-            return result.scalars().first()
+        options = build_relation(RepairRequest, preloads)
+        stmt = select(RepairRequest).options(*options).where(RepairRequest.id == id_)
+        result = await database.execute(stmt)
+        return result.scalars().first()
 
-        return obj
+class FileRepository(CRUDRepository[File]):
+    def __init__(self):
+        super().__init__(File)
 
+    async def get_by_repair_request_id(self, repair_request_id: int, database: AsyncSession) -> list[File]:
+        stmt = select(File).where(File.repair_request_id == repair_request_id)
+        return list((await database.execute(stmt)).unique().scalars().all())

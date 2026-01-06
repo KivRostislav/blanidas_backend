@@ -1,11 +1,15 @@
-from fastapi import APIRouter
-from fastapi.params import Depends
+import json
 
-from src.equipment_category.models import EquipmentCategoryInfo, EquipmentCategoryFilters, EquipmentCategoryCreate, EquipmentCategoryUpdate
+from fastapi import APIRouter
+from fastapi.params import Depends, Query
+
+from src.decorators import domain_errors
+from src.equipment_category.errors import errors_map
+from src.equipment_category.models import EquipmentCategoryInfo, EquipmentCategoryCreate, EquipmentCategoryUpdate
 from src.equipment_category.services import EquipmentCategoryServices
 from src.pagination import PaginationResponse, Pagination
 from src.database import DatabaseSession
-
+from src.sorting import Sorting
 
 router = APIRouter(prefix="/equipment-categories", tags=["Equipment Category"])
 services = EquipmentCategoryServices()
@@ -14,37 +18,27 @@ services = EquipmentCategoryServices()
 async def get_equipment_category_list_endpoint(
         database: DatabaseSession,
         pagination: Pagination = Depends(),
-        filters: EquipmentCategoryFilters = Depends(),
+        sorting: Sorting = Depends(),
+        filters: str | None = Query(None),
 ) -> PaginationResponse[EquipmentCategoryInfo]:
     return await services.paginate(
         database=database,
         pagination=pagination,
-        filters=filters.model_dump(exclude_none=True),
+        filters=json.loads(filters) if filters else None,
+        sorting=None if sorting.sort_by == "" else sorting,
     )
 
 @router.post("/", response_model=EquipmentCategoryInfo)
-async def create_equipment_category_endpoint(
-        model: EquipmentCategoryCreate,
-        database: DatabaseSession,
-) -> EquipmentCategoryInfo:
-    return await services.create(
-        data=model.model_dump(exclude_none=True),
-        database=database,
-        unique_fields=["name"]
-    )
+@domain_errors(errors_map)
+async def create_equipment_category_endpoint(model: EquipmentCategoryCreate, database: DatabaseSession) -> EquipmentCategoryInfo:
+    return await services.create(data=model.model_dump(exclude_none=True), database=database)
 
 @router.put("/", response_model=EquipmentCategoryInfo)
-async def update_equipment_category_endpoint(
-        model: EquipmentCategoryUpdate,
-        database: DatabaseSession,
-) -> EquipmentCategoryInfo:
-    return await services.update(
-        id_=model.id,
-        data=model.model_dump(exclude_none=True),
-        database=database,
-        unique_fields=["name"]
-    )
+@domain_errors(errors_map)
+async def update_equipment_category_endpoint(model: EquipmentCategoryUpdate, database: DatabaseSession) -> EquipmentCategoryInfo:
+    return await services.update(id_=model.id, data=model.model_dump(exclude_none=True), database=database)
 
-@router.delete("/{id_}", response_model=None)
-async def delete_equipment_category_endpoint(id_: int, database: DatabaseSession) -> None:
+@router.delete("/{id_}", response_model=int)
+@domain_errors(errors_map)
+async def delete_equipment_category_endpoint(id_: int, database: DatabaseSession) -> int:
     return await services.delete(id_=id_, database=database)

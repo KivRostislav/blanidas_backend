@@ -8,7 +8,7 @@ class EquipmentModel(BaseDatabaseModel):
     __tablename__ = "equipment_model"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column()
+    name: Mapped[str] = mapped_column(unique=True)
 
     equipment: Mapped[list["Equipment"]] = relationship(back_populates="equipment_model", lazy="noload")
     spare_parts: Mapped[list["SparePart"]] = relationship(
@@ -16,9 +16,3 @@ class EquipmentModel(BaseDatabaseModel):
         secondary="equipment_model_spare_part",
         lazy="noload"
     )
-
-class EquipmentModelSparePart(BaseDatabaseModel):
-    __tablename__ = "equipment_model_spare_part"
-
-    spare_part_id: Mapped[int] = mapped_column(ForeignKey("spare_part.id", ondelete="CASCADE"), primary_key=True)
-    equipment_model_id: Mapped[int] = mapped_column(ForeignKey("equipment_model.id", ondelete="CASCADE"), primary_key=True)

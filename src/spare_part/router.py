@@ -1,12 +1,16 @@
+import json
+
 from fastapi import APIRouter, BackgroundTasks
 from fastapi.params import Depends, Query
 
-from sorting import SortOrder, Sorting
+from src.decorators import domain_errors
+from src.sorting import Sorting
 from src.database import DatabaseSession
 from src.pagination import Pagination
 from src.pagination import PaginationResponse
 from src.mailer.dependencies import MailerServiceDep
-from src.spare_part.models import SparePartInfo, SparePartFilters, SparePartCreate, SparePartUpdate, SparePartsSortBy
+from src.spare_part.errors import errors_map
+from src.spare_part.models import SparePartInfo, SparePartCreate, SparePartUpdate
 from src.spare_part.services import SparePartServices
 
 router = APIRouter(prefix="/spare-parts", tags=["Spare Parts"])
@@ -16,42 +20,22 @@ services = SparePartServices()
 async def get_spare_part_list_endpoint(
         database: DatabaseSession,
         pagination: Pagination = Depends(),
-        filters: SparePartFilters = Depends(),
-        sort_by: SparePartsSortBy | None = Query(None),
-        sort_order: SortOrder = Query(SortOrder.ascending),
+        sorting: Sorting = Depends(),
+        filters: str | None = Query(None),
 ) -> PaginationResponse[SparePartInfo]:
     return await services.paginate(
         database=database,
         pagination=pagination,
-        sorting=Sorting(order=sort_order, order_by=sort_by) if sort_by else None,
-        filters=filters.model_dump(exclude_none=True),
-        preloads=[
-            "supplier",
-            "spare_part_category",
-            "manufacturer",
-            "locations",
-            "locations.institution",
-            "locations.institution.institution_type",
-            "compatible_models"
-        ]
+        filters=json.loads(filters) if filters else None,
+        sorting=None if sorting.sort_by == "" else sorting,
     )
 
 @router.post("/", response_model=SparePartInfo)
-async def create_spare_part_endpoint(
-        model: SparePartCreate,
-        database: DatabaseSession,
-) -> SparePartInfo:
+@domain_errors(errors_map)
+async def create_spare_part_endpoint(model: SparePartCreate, database: DatabaseSession) -> SparePartInfo:
     return await services.create(
         data=model.model_dump(exclude_none=True),
         database=database,
-        unique_fields=["name"],
-        relationship_fields=[
-            "manufacturer",
-            "spare_part_category",
-            "supplier",
-            "compatible_models",
-            "locations"
-        ],
         preloads=[
             "compatible_models",
             "locations",
@@ -64,30 +48,14 @@ async def create_spare_part_endpoint(
     )
 
 @router.put("/", response_model=SparePartInfo)
-async def update_spare_part_endpoint(
-        model: SparePartUpdate,
-        mailer: MailerServiceDep,
-        background_task: BackgroundTasks,
-        database: DatabaseSession,
-) -> SparePartInfo:
+@domain_errors(errors_map)
+async def update_spare_part_endpoint(model: SparePartUpdate, database: DatabaseSession, mailer: MailerServiceDep, background_task: BackgroundTasks) -> SparePartInfo:
     return await services.update(
         id_=model.id,
         data=model.model_dump(exclude_none=True),
         database=database,
         mailer=mailer,
         background_tasks=background_task,
-        unique_fields=["name"],
-        relationship_fields=[
-            "locations",
-            "manufacturer",
-            "spare_part_category",
-            "supplier",
-            "compatible_models",
-        ],
-        overwrite_relationships=[
-            "locations",
-            "compatible_models",
-        ],
         preloads=[
             "compatible_models",
             "supplier",
@@ -99,16 +67,7 @@ async def update_spare_part_endpoint(
         ]
     )
 
-@router.delete("/{id_}", response_model=None)
-async def delete_spare_part_endpoint(id_: int, database: DatabaseSession) -> None:
-    return await services.delete(
-        id_=id_,
-        database=database,
-        relationship_fields=[
-            "locations",
-            "manufacturer",
-            "spare_part_category",
-            "supplier",
-            "compatible_models",
-        ],
-    )
+@router.delete("/{id_}", response_model=int)
+@domain_errors(errors_map)
+async def delete_spare_part_endpoint(id_: int, database: DatabaseSession) -> int:
+    return await services.delete(id_=id_, database=database)

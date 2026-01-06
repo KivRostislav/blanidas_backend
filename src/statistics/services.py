@@ -8,8 +8,8 @@ from src.institution.schemas import Institution
 from src.repair_request.schemas import RepairRequest
 from src.statistics.models import CenterBreakdownItem, StatisticsResponse, TimeFrame, \
     CenterBreakdown, FailureTypeItem, FailureTypes, ModelBreakdown, ModelBreakdownItem, StatisticsTimeStep, \
-    TimeDynamicsItem, TimeDynamics, AvgRepairTimeItem, AvgRepairTime, EquipmentBreakdownItem, EquipmentBreakdown
-from src.summary.queries import equipment_subquery
+    TimeDynamicsItem, TimeDynamics, AvgRepairTimeItem, AvgRepairTime, EquipmentBreakdownItem, EquipmentBreakdown, \
+    CategoricalChartDataItem
 
 time_slot_format = {
     StatisticsTimeStep.hour: "%Y-%m-%d %H:00:00",
@@ -19,10 +19,9 @@ time_slot_format = {
 
 class StatisticsServices:
     @staticmethod
-    async def get(database: AsyncSession, data: dict):
-        query_centers = await database.execute(
+    async def get(database: AsyncSession, data: dict) -> StatisticsResponse:
+        query_institution = await database.execute(
             select(
-                Institution.id.label("institution_id"),
                 Institution.name.label("institution_name"),
                 func.count(RepairRequest.id).label("breakdown_count")
             )
@@ -34,21 +33,16 @@ class StatisticsServices:
             .limit(10)
         )
 
-        center_items = [
-            CenterBreakdownItem(
-                center_id=row[0],
-                center_name=row[1],
-                breakdown_count=row[2]
-            )
-            for row in query_centers.all()
+        institution_items = [
+            CategoricalChartDataItem(
+                label=row[0],
+                value=row[1]
+            ) for row in query_institution.all()
         ]
 
+
         query_failure_types = await database.execute(
-            select(
-                FailureType.id,
-                FailureType.name,
-                func.count(RepairRequest.id).label("count")
-            )
+            select(FailureType.name, func.count(RepairRequest.id).label("count"))
             .select_from(FailureType)
             .join(FailureTypeRepairRequest, FailureType.id == FailureTypeRepairRequest.failure_type_id)
             .join(RepairRequest, FailureTypeRepairRequest.repair_request_id == RepairRequest.id)
@@ -178,7 +172,7 @@ class StatisticsServices:
         ]
 
         return StatisticsResponse(
-            center_breakdown=CenterBreakdown(items=center_items),
+            center_breakdown=CenterBreakdown(items=institution_items),
             failure_types=FailureTypes(items=failure_types_items),
             model_breakdown=ModelBreakdown(items=models_items),
             time_dynamics=TimeDynamics(items=time_dynamics),
