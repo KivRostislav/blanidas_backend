@@ -13,7 +13,6 @@ from sqlalchemy import select, func, case
 
 from sqlalchemy import case, and_, func
 def apply_spare_parts_sorting(stmt: Select, sorting: Sorting, related_fields: SortingRelatedFieldsMap) -> Select:
-    # Підзапит для підрахунку загальної кількості деталей
     total_quantity_subq = (
         select(
             Location.spare_part_id.label("spare_part_id"),
@@ -23,14 +22,10 @@ def apply_spare_parts_sorting(stmt: Select, sorting: Sorting, related_fields: So
         .subquery()
     )
 
-    # Аліас для підзапиту
     total_qty_alias = aliased(total_quantity_subq)
-
-    # Колонка для сортування
     total_qty_col = func.coalesce(total_qty_alias.c.total_quantity, 0)
 
     if sorting.sort_by == "quantity":
-        # Приєднуємо підзапит і сортуємо
         return stmt.outerjoin(
             total_qty_alias,
             SparePart.id == total_qty_alias.c.spare_part_id
@@ -40,7 +35,6 @@ def apply_spare_parts_sorting(stmt: Select, sorting: Sorting, related_fields: So
 
 
     if sorting.sort_by == "stock_status":
-        # Статус: 0 - out_of_stock, 1 - low_stock, 2 - in_stock
         status_expr = case(
             (total_qty_col > SparePart.min_quantity, 2),
             (and_(total_qty_col > 0, total_qty_col <= SparePart.min_quantity), 1),

@@ -1,3 +1,5 @@
+from select import select
+
 from sqlalchemy import ForeignKey, UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import Mapped, relationship, mapped_column
 
@@ -38,7 +40,11 @@ class SparePart(BaseDatabaseModel):
     manufacturer_id: Mapped[int | None] = mapped_column(ForeignKey("manufacturer.id", ondelete="SET NULL"), nullable=True)
     manufacturer: Mapped["Manufacturer"] = relationship(back_populates="spare_parts", lazy="noload")
 
-    locations: Mapped[list["Location"]] = relationship(back_populates="spare_part", lazy="noload")
+    locations: Mapped[list["Location"]] = relationship(
+        back_populates="spare_part",
+        lazy="noload",
+        order_by="Location.quantity.desc()",
+    )
 
     compatible_models: Mapped[list["EquipmentModel"]] = relationship(
         back_populates="spare_parts",

@@ -2,9 +2,10 @@ from math import ceil
 
 from sqlalchemy import select, inspect, func, update, delete, insert, distinct
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, contains_eager
+from sqlalchemy.orm import joinedload, contains_eager, selectinload
 
 from src.decorators import integrity_errors
+from src.institution.models import InstitutionInfo
 from src.sorting import Sorting, SortOrder, apply_sorting_wrapper, SortingRelatedField
 from src.exceptions import DomainError, ErrorCode
 from src.institution.schemas import Institution
@@ -49,27 +50,17 @@ class SparePartRepository(CRUDRepository[SparePart]):
     ) -> tuple[list[SparePart], int]:
         filters = filters or {}
 
-        stmt = (
-            select(SparePart)
-            .join(SparePart.supplier, isouter=True)
-            .join(SparePart.spare_part_category, isouter=True)
-            .join(SparePart.manufacturer, isouter=True)
-            .join(SparePart.compatible_models, isouter=True)
-            .join(SparePart.locations, isouter=True)
-            .join(Location.institution, isouter=True)
-            .join(Institution.institution_type, isouter=True)
-            .options(
-                contains_eager(SparePart.supplier),
-                contains_eager(SparePart.spare_part_category),
-                contains_eager(SparePart.manufacturer),
-                contains_eager(SparePart.compatible_models),
-                contains_eager(SparePart.locations)
-                .contains_eager(Location.institution)
-                .contains_eager(Institution.institution_type),
-            )
+        preloads = [
+            "compatible_models",
+            "locations",
+            "locations.institution",
+            "locations.institution.institution_type",
+            "manufacturer",
+            "spare_part_category",
+            "supplier",
+        ]
 
-            .order_by(Institution.name)
-        )
+        stmt = (select(SparePart).options(*build_relation(SparePart, preloads)))
 
         stmt = self.filter_callback(stmt, filters)
 
