@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.sorting import Sorting
 from src.equipment.models import EquipmentInfo
-from src.exceptions import NotFoundError, DomainError, ErrorCode
+from src.exceptions import NotFoundError, DomainError, DomainErrorCode
 from src.pagination import PaginationResponse, Pagination
 from src.repository import CRUDRepository
 
@@ -58,7 +58,4 @@ class GenericServices(Generic[ModelType, InfoType]):
 
     async def get(self, id_: int, database: AsyncSession, preloads: list[str] | None = None) -> InfoType:
         result = await self.repo.get(id_=id_, database=database, preloads=preloads)
-        if not result:
-            raise DomainError(code=ErrorCode.not_entity)
-
         return self.return_type.model_validate(result.__dict__, from_attributes=True)

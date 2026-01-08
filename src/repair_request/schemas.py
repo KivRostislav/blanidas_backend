@@ -5,7 +5,6 @@ from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, relationship, mapped_column
 
 from src.database import BaseDatabaseModel
-from src.equipment.schemas import Equipment
 from src.failure_type.schemas import FailureType, FailureTypeRepairRequest
 
 

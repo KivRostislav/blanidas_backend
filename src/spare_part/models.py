@@ -4,14 +4,10 @@ from enum import Enum
 from src.equipment_model.models import EquipmentModelInfo
 from src.institution.models import InstitutionInfo
 from src.manufacturer.models import ManufacturerInfo
+from src.spare_part.schemas import StockStatus
 from src.spare_part_category.models import SparePartCategoryInfo
 from src.supplier.models import SupplierInfo
 
-
-class StockStatus(str, Enum):
-    in_stock = "in_stock"
-    low_stock = "low_stock"
-    out_of_stock = "out_of_stock"
 
 class LocationInfo(BaseModel):
     id: int
@@ -26,6 +22,8 @@ class SparePartInfo(BaseModel):
     id: int
     name: str
     min_quantity: int
+    total_quantity: int
+    stock_status: StockStatus
     compatible_models: list[EquipmentModelInfo]
 
     locations: list[LocationInfo]

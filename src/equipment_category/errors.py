@@ -1,10 +1,10 @@
-from src.exceptions import ErrorMap, ErrorsMap, ErrorCode
+from src.exceptions import ErrorMap, ErrorsMap, DomainErrorCode, ApiErrorCode
 
 errors_map: ErrorsMap = {
-    ErrorCode.duplication: {
-        "name": ErrorMap(code="name exists", message="Категорія обладнання з такою назвою уже існує"),
+    DomainErrorCode.duplication: {
+        "name": ErrorMap(code=ApiErrorCode.value_already_exists, message="Категорія обладнання з такою назвою уже існує"),
     },
-    ErrorCode.not_entity: {
-        "": ErrorMap(code="not found", message="Категорії обладнання з таким id не існує")
+    DomainErrorCode.not_entity: {
+        "": ErrorMap(code=ApiErrorCode.not_found, message="Категорії обладнання з таким ідентифікатором не існує")
     }
 }

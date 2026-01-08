@@ -19,9 +19,4 @@ def error_wrapper(
             except_func(e)
     return wrapper
 
-def domain_error_wrapper(
-        func: Callable[TParams, Awaitable[TReturn]],
-        errors_map: ErrorsMap
-) -> Callable[TParams, Awaitable[TReturn]]:
-    return error_wrapper(DomainError, func, lambda e: raise ApiError(e, errors_map))
 

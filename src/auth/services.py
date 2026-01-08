@@ -16,7 +16,7 @@ from src.auth.schemas import User, Role
 from src.auth.utils import generate_jwt_token, TokenType, generate_payload
 from src.config import JWTSettings
 from src.database import session_factory
-from src.exceptions import UniqueConstraintError, DomainError, ErrorCode
+from src.exceptions import UniqueConstraintError, DomainError, DomainErrorCode
 from src.pagination import Pagination
 from src.repository import CRUDRepository
 from src.services import GenericServices
@@ -42,7 +42,7 @@ class AuthServices(GenericServices[User, UserInfo]):
         try:
             return await self.create(data=data, database=database, preloads=preloads)
         except DomainError as e:
-            if e.code != ErrorCode.duplication: raise
+            if e.code != DomainErrorCode.duplication: raise
             return None
 
     async def update(self, id_: int, data: dict, database: AsyncSession, preloads: list[str] | None = None) -> UserInfo:
@@ -56,7 +56,7 @@ class AuthServices(GenericServices[User, UserInfo]):
         user = await self.repo.get_by_email(data["email"], database=database, preloads=["workplace"])
 
         if not user and not password_hash.verify(data["password"], str(user.password_hash)):
-            raise DomainError(code=ErrorCode.authentication, field="email, password")
+            raise DomainError(code=DomainErrorCode.authentication, field="email, password")
 
         payload = generate_payload(user)
 
@@ -69,12 +69,12 @@ class AuthServices(GenericServices[User, UserInfo]):
         try:
             token_data = jwt.decode(data["refresh_token"], jwt_settings.secret_key, algorithms=[jwt_settings.algorithm])
         except jwt.ExpiredSignatureError:
-            raise DomainError(code=ErrorCode.invalid_token, field="refresh_token")
+            raise DomainError(code=DomainErrorCode.invalid_token, field="refresh_token")
 
         try:
             user = await self.repo.get(token_data["id"], database=database)
         except HTTPException:
-            raise DomainError(code=ErrorCode.invalid_token, field="refresh_token")
+            raise DomainError(code=DomainErrorCode.invalid_token, field="refresh_token")
 
         payload = generate_payload(user)
         access_token = generate_jwt_token(token_type=TokenType.access, payload=payload, settings=jwt_settings)

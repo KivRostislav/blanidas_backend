@@ -1,10 +1,10 @@
-from src.exceptions import ErrorCode, ErrorsMap, ErrorMap
+from src.exceptions import DomainErrorCode, ErrorsMap, ErrorMap, ApiErrorCode
 
 errors_map: ErrorsMap = {
-    ErrorCode.duplication: {
-        "name": ErrorMap(code="name exists", message="Тип закладу з такою назвою уже існує"),
+    DomainErrorCode.duplication: {
+        "name": ErrorMap(code=ApiErrorCode.value_already_exists, message="Тип закладу з такою назвою уже існує"),
     },
-    ErrorCode.not_entity: {
-        "": ErrorMap(code="not found", message="Типу закладу з таким id не існує")
+    DomainErrorCode.not_entity: {
+        "": ErrorMap(code=ApiErrorCode.not_found, message="Типу закладу з таким ідентифікатором не існує")
     }
 }

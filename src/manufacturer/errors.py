@@ -1,11 +1,11 @@
-from src.exceptions import ErrorCode, ErrorMap
+from src.exceptions import DomainErrorCode, ErrorMap, ApiErrorCode
 
-error_map: dict[ErrorCode, dict[str, ErrorMap]] = {
-    ErrorCode.duplication: {
-        "name": ErrorMap(code="name exists", message="Виробник з такою назвою уже існує"),
+error_map: dict[DomainErrorCode, dict[str, ErrorMap]] = {
+    DomainErrorCode.duplication: {
+        "name": ErrorMap(code=ApiErrorCode.value_already_exists, message="Виробник з такою назвою уже існує"),
     },
-    ErrorCode.not_entity: {
-        "": ErrorMap(code="not found", message="Виробника з таким id не існує")
+    DomainErrorCode.not_entity: {
+        "": ErrorMap(code=ApiErrorCode.not_found, message="Виробника з таким ідентифікатором не існує")
     }
 }
 

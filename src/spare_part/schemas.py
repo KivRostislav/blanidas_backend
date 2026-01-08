@@ -1,11 +1,16 @@
-from select import select
+from enum import Enum
 
-from sqlalchemy import ForeignKey, UniqueConstraint, CheckConstraint
-from sqlalchemy.orm import Mapped, relationship, mapped_column
+from sqlalchemy import ForeignKey, UniqueConstraint, CheckConstraint, func, select, case, and_
+from sqlalchemy.orm import Mapped, relationship, mapped_column, column_property
 
 from src.database import BaseDatabaseModel
 from src.institution.schemas import Institution
+from src.repair_request.schemas import RepairRequestStatus
 
+class StockStatus(str, Enum):
+    in_stock = "in_stock"
+    low_stock = "low_stock"
+    out_of_stock = "out_of_stock"
 
 class Location(BaseDatabaseModel):
     __tablename__ = "location"
@@ -23,13 +28,40 @@ class Location(BaseDatabaseModel):
     spare_part_id: Mapped[int | None] = mapped_column(ForeignKey("spare_part.id", ondelete="CASCADE"))
     spare_part: Mapped["SparePart"] = relationship(back_populates="locations", lazy="noload")
 
+
 class SparePart(BaseDatabaseModel):
     __tablename__ = "spare_part"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+
+    total_quantity_expr = (
+        select(func.coalesce(func.sum(Location.quantity), 0))
+        .where(Location.spare_part_id == id)
+        .correlate_except(Location)
+        .scalar_subquery()
+    )
+
     name: Mapped[str] = mapped_column(unique=True)
     min_quantity: Mapped[int] = mapped_column()
     note: Mapped[str | None] = mapped_column(nullable=True)
+    total_quantity: Mapped[int] = column_property(total_quantity_expr)
+
+    stock_status: Mapped[RepairRequestStatus] = column_property(
+        case(
+            (
+                total_quantity_expr >= min_quantity,
+                StockStatus.in_stock,
+            ),
+            (
+                and_(
+                    total_quantity_expr < min_quantity,
+                    total_quantity_expr > 0,
+                ),
+                StockStatus.low_stock,
+            ),
+            else_=StockStatus.out_of_stock,
+        )
+    )
 
     supplier_id: Mapped[int | None] = mapped_column(ForeignKey("supplier.id", ondelete="SET NULL"), nullable=True)
     supplier: Mapped["Supplier"] = relationship(back_populates="spare_parts", lazy="noload")

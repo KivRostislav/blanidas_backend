@@ -7,7 +7,7 @@ from sqlalchemy.orm import joinedload, contains_eager, selectinload
 from src.decorators import integrity_errors
 from src.institution.models import InstitutionInfo
 from src.sorting import Sorting, SortOrder, apply_sorting_wrapper, SortingRelatedField
-from src.exceptions import DomainError, ErrorCode
+from src.exceptions import DomainError, DomainErrorCode
 from src.institution.schemas import Institution
 from src.repository import CRUDRepository
 from src.spare_part.filters import apply_spare_parts_filters
@@ -39,48 +39,6 @@ class SparePartRepository(CRUDRepository[SparePart]):
             sorting_callback=apply_sorting_wrapper(apply_spare_parts_sorting, sorting_related_fields_map),
         )
 
-    async def fetch(
-            self,
-            database: AsyncSession,
-            filters: Filters | None = None,
-            preloads: list[str] | None = None,
-            sorting: Sorting | None = None,
-            offset: int | None = None,
-            limit: int | None = None,
-    ) -> tuple[list[SparePart], int]:
-        filters = filters or {}
-
-        preloads = [
-            "compatible_models",
-            "locations",
-            "locations.institution",
-            "locations.institution.institution_type",
-            "manufacturer",
-            "spare_part_category",
-            "supplier",
-        ]
-
-        stmt = (select(SparePart).options(*build_relation(SparePart, preloads)))
-
-        stmt = self.filter_callback(stmt, filters)
-
-        if sorting:
-            stmt = self.sorting_callback(stmt, sorting)
-
-        count_stmt = select(func.count(distinct(SparePart.id))).select_from(SparePart)
-        if filters:
-            count_stmt = self.filter_callback(count_stmt, filters)
-
-        total = (await database.execute(count_stmt)).scalar() or 0
-
-        if limit is not None:
-            stmt = stmt.offset(offset or 0).limit(limit)
-
-        result = await database.execute(stmt)
-        items = result.unique().scalars().all()
-
-        return list(items), total
-
     @integrity_errors()
     async def create(self, data: dict, database: AsyncSession, preloads: list[str] | None = None) -> SparePart:
         data_model = SparePartCreate.model_validate(data)
@@ -108,7 +66,7 @@ class SparePartRepository(CRUDRepository[SparePart]):
         fields_to_update = data_model.model_dump(exclude={"locations", "compatible_models_ids"}, exclude_unset=True)
         rows = await database.execute(update(SparePart).where(SparePart.id == id_).values(fields_to_update))
         if rows.rowcount == 0:
-            raise DomainError(ErrorCode.not_entity)
+            raise DomainError(DomainErrorCode.not_entity)
 
         if data_model.compatible_models_ids is not None:
             await database.execute(delete(EquipmentModelSparePart).where(EquipmentModelSparePart.spare_part_id == id_))

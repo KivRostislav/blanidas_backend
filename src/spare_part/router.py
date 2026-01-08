@@ -28,6 +28,15 @@ async def get_spare_part_list_endpoint(
         pagination=pagination,
         filters=json.loads(filters) if filters else None,
         sorting=None if sorting.sort_by == "" else sorting,
+        preloads=[
+            "compatible_models",
+            "locations",
+            "locations.institution",
+            "locations.institution.institution_type",
+            "manufacturer",
+            "spare_part_category",
+            "supplier",
+        ]
     )
 
 @router.post("/", response_model=SparePartInfo)

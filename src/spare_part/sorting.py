@@ -22,13 +22,12 @@ def apply_spare_parts_sorting(stmt: Select, sorting: Sorting, related_fields: So
         .subquery()
     )
 
-    total_qty_alias = aliased(total_quantity_subq)
-    total_qty_col = func.coalesce(total_qty_alias.c.total_quantity, 0)
+    total_qty_col = func.coalesce(total_quantity_subq.c.total_quantity, 0)
 
     if sorting.sort_by == "quantity":
         return stmt.outerjoin(
-            total_qty_alias,
-            SparePart.id == total_qty_alias.c.spare_part_id
+            total_quantity_subq,
+            SparePart.id == total_quantity_subq.c.spare_part_id
         ).order_by(
             total_qty_col.desc() if sorting.sort_order == SortOrder.descending else total_qty_col.asc()
         )

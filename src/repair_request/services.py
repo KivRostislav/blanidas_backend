@@ -8,7 +8,7 @@ import magic
 from fastapi import UploadFile, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.exceptions import DomainError, ErrorCode
+from src.exceptions import DomainError, DomainErrorCode
 from src.sorting import Sorting
 from src.auth.schemas import User
 from src.event import emit, EventTypes
@@ -95,7 +95,7 @@ class RepairRequestServices(GenericServices[RepairRequest, RepairRequestInfo]):
                         raise
                     new_files[f"{uuid.uuid4()}.{ext}"] = content
             except Exception:
-                raise DomainError(code=ErrorCode.unsupported_file_type, field="photos")
+                raise DomainError(code=DomainErrorCode.unsupported_file_type, field="photos")
 
             saved_files = []
             try:
@@ -185,7 +185,7 @@ class RepairRequestServices(GenericServices[RepairRequest, RepairRequestInfo]):
     async def get(self, id_: int, database: AsyncSession, preloads: list[str] | None = None) -> RepairRequestInfo:
         result = await self.repo.get(id_=id_, database=database, preloads=preloads)
         if result is None:
-            raise DomainError(code=ErrorCode.not_entity)
+            raise DomainError(code=DomainErrorCode.not_entity)
 
         for photo in result.photos:
             photo.file_path = form_url_to_file(self.proxy_url_to_static_files_dir, str(photo.file_path))

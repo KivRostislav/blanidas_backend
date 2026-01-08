@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.sorting import Sorting, apply_sorting_wrapper, apply_sorting
 from src.decorators import integrity_errors
-from src.exceptions import DomainError, ErrorCode
+from src.exceptions import DomainError, DomainErrorCode
 from src.filters import apply_filters, apply_filters_wrapper
 from src.sorting import SortingCallback
 from src.utils import build_relation
@@ -61,10 +61,15 @@ class CRUDRepository(Generic[ModelType]):
 
         return list(items), total
 
-    async def get(self, id_: int, database: AsyncSession, preloads: list[str] | None = None) -> ModelType | None:
+    async def get(self, id_: int, database: AsyncSession, preloads: list[str] | None = None) -> ModelType:
         options = build_relation(self.model, preloads or [])
         stmt = select(self.model).options(*options).where(self.model.id == id_)
-        return (await database.execute(stmt)).unique().scalars().first()
+        obj = (await database.execute(stmt)).unique().scalars().first()
+
+        if obj is None:
+            raise DomainError(code=DomainErrorCode.not_entity)
+
+        return obj
 
     @integrity_errors()
     async def create(self, data: dict, database: AsyncSession, preloads: list[str] | None = None) -> ModelType:
@@ -94,16 +99,7 @@ class CRUDRepository(Generic[ModelType]):
                 await database.execute(stmt)
 
         await database.commit()
-
-        preload_options = build_relation(self.model, preloads)
-        stmt = (
-            select(self.model)
-            .options(*preload_options)
-            .where(self.model.id == obj.id)
-        )
-
-        result = await database.execute(stmt)
-        return result.scalars().first()
+        return await self.get(obj.id, database, preloads)
 
     @integrity_errors()
     async def update(self, id_: int, data: dict, database: AsyncSession, preloads: list[str] | None = None) -> ModelType:
@@ -111,7 +107,7 @@ class CRUDRepository(Generic[ModelType]):
 
         rows = await database.execute(update(self.model).where(self.model.id == id_).values(data))
         if rows.rowcount == 0:
-            raise DomainError(code=ErrorCode.not_entity, field="")
+            raise DomainError(code=DomainErrorCode.not_entity, field="")
 
         association_inserts = []
         for field in inspect(self.model).relationships:
@@ -134,21 +130,14 @@ class CRUDRepository(Generic[ModelType]):
 
         await database.commit()
 
-        stmt = select(self.model)
-        if preloads:
-            options = build_relation(self.model, preloads)
-            stmt = stmt.options(*options)
-
-        stmt = stmt.where(self.model.id == id_).execution_options(populate_existing=True)
-        result = await database.execute(stmt)
-        return result.scalars().first()
+        return await self.get(id_, database, preloads)
 
 
     async def delete(self, id_: int, database: AsyncSession) -> int:
         stmt = delete(self.model).where(self.model.id == id_)
         result = await database.execute(stmt)
         if result.rowcount == 0:
-            raise DomainError(code=ErrorCode.not_entity, field="")
+            raise DomainError(code=DomainErrorCode.not_entity, field="")
 
         await database.commit()
         return id_

@@ -19,7 +19,7 @@ from src.mailer.subscriber import on_low_stock, on_repair_request_created # need
 
 from src.router import router
 
-from .exceptions import DomainError, NotFoundError, ApiError, ErrorCode, ErrorMap
+from .exceptions import DomainError, NotFoundError, ApiError, DomainErrorCode, ErrorMap
 
 
 @asynccontextmanager
@@ -64,10 +64,14 @@ async def error_handler(request: Request, call_next):
     except ApiError as exc:
         mapped_error = exc.error_map[exc.code][exc.field]
         status_code = status.HTTP_400_BAD_REQUEST
-        if exc.code == ErrorCode.not_entity:
+        if exc.code == DomainErrorCode.not_entity:
             status_code = status.HTTP_404_NOT_FOUND
 
-        return JSONResponse(status_code=status_code, content={"code": mapped_error.code, "message": mapped_error.message})
+        return JSONResponse(status_code=status_code, content={
+            "code": mapped_error.code,
+            "message": mapped_error.message,
+            "fields": exc.field,
+        })
     except Exception:
         raise
         # return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})

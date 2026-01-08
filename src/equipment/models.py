@@ -3,21 +3,18 @@ from enum import Enum
 
 from pydantic import BaseModel, field_serializer
 
+from src.equipment.schemas import EquipmentStatus
 from src.equipment_category.models import EquipmentCategoryInfo
 from src.equipment_model.models import EquipmentModelInfo
 from src.institution.models import InstitutionInfo
 from src.manufacturer.models import ManufacturerInfo
-
-class Status(str, Enum):
-    working = 'working'
-    under_maintenance = 'under_maintenance'
-    not_working = 'not_working'
 
 class EquipmentInfo(BaseModel):
     id: int
     serial_number: str
     installed: date
     location: str
+    status: EquipmentStatus
     institution: InstitutionInfo | None = None
     equipment_model: EquipmentModelInfo | None = None
     equipment_category: EquipmentCategoryInfo | None = None
