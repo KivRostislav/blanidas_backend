@@ -1,4 +1,5 @@
 from sqlalchemy import or_, select, Select, exists, not_, and_
+from sqlalchemy.orm import aliased
 
 from src.equipment.models import EquipmentStatus
 from src.filters import Filters, FilterRelatedFieldsMap, get_filter_value
@@ -13,17 +14,14 @@ def apply_equipment_filters(stmt: Select, data: Filters, related_fields: FilterR
     or_conditions = get_filter_value(data.get("equipment_model_name_or_serial_number"), column=Equipment.serial_number)
 
     if or_conditions is not None:
-        stmt = stmt.where(
-            exists(
-                select(1)
-                .where(
-                    and_(
-                        EquipmentModel.id == Equipment.equipment_model_id,
-                        or_(
-                            Equipment.serial_number.ilike(f"%{or_conditions}%"),
-                            EquipmentModel.name.ilike(f"%{or_conditions}%"),
-                        )
-                    )
+        EquipmentModelAlias = aliased(EquipmentModel)
+        stmt = (
+            stmt
+            .join(EquipmentModelAlias, EquipmentModelAlias.id == Equipment.equipment_model_id)
+            .where(
+                or_(
+                    Equipment.serial_number.ilike(f"%{or_conditions}%"),
+                    EquipmentModelAlias.name.ilike(f"%{or_conditions}%"),
                 )
             )
         )
