@@ -15,10 +15,7 @@ from src.auth.repository import AuthRepository
 from src.auth.schemas import User, Role
 from src.auth.utils import generate_jwt_token, TokenType, generate_payload
 from src.config import JWTSettings
-from src.database import session_factory
-from src.exceptions import UniqueConstraintError, DomainError, DomainErrorCode
-from src.pagination import Pagination
-from src.repository import CRUDRepository
+from src.exceptions import DomainError, DomainErrorCode
 from src.services import GenericServices
 
 password_hash = PasswordHash.recommended()

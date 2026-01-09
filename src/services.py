@@ -4,8 +4,6 @@ from typing import Generic, TypeVar, Type
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.sorting import Sorting
-from src.equipment.models import EquipmentInfo
-from src.exceptions import NotFoundError, DomainError, DomainErrorCode
 from src.pagination import PaginationResponse, Pagination
 from src.repository import CRUDRepository
 

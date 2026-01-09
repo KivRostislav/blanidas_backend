@@ -10,7 +10,7 @@ from src.auth.schemas import User
 from src.decorators import integrity_errors
 from src.equipment.schemas import Equipment
 from src.equipment_category.schemas import EquipmentCategory
-from src.exceptions import NotFoundError, ForeignKeyNotFoundError, DomainError, DomainErrorCode
+from src.exceptions import DomainError, DomainErrorCode
 from src.failure_type.schemas import FailureType, FailureTypeRepairRequest
 from src.filters import FilterRelatedField, apply_filters_wrapper
 from src.repair_request.filters import apply_repair_request_filters
