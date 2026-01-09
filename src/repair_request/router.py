@@ -113,11 +113,19 @@ async def create_repair_request_endpoint(
 
 @router.put("/", response_model=RepairRequestInfo)
 @domain_errors(error_map)
-async def update_repair_request_endpoint(model: RepairRequestUpdate, database: DatabaseSession, _: Annotated[None, Depends(allowed())]) -> RepairRequestInfo:
+async def update_repair_request_endpoint(
+        model: RepairRequestUpdate,
+        database: DatabaseSession,
+        mailer: MailerServiceDep,
+        background_task: BackgroundTasks,
+        _: Annotated[None, Depends(allowed())]
+) -> RepairRequestInfo:
     return await services.update(
         id_=model.id,
         database=database,
         data=model.model_dump(exclude_none=True),
+        mailer=mailer,
+        background_tasks=background_task,
         preloads=[
             "failure_types",
             "used_spare_parts",

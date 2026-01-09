@@ -8,6 +8,7 @@ import magic
 from fastapi import UploadFile, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.auth.repository import AuthRepository
 from src.exceptions import DomainError, DomainErrorCode
 from src.sorting import Sorting
 from src.auth.schemas import User
@@ -15,11 +16,13 @@ from src.event import emit, EventTypes
 from src.mailer.smtp import MailerService
 from src.mailer.models import RepairRequestCreatedMessagePayload
 from src.pagination import Pagination, PaginationResponse
-from src.repair_request.models import RepairRequestInfo
+from src.repair_request.models import RepairRequestInfo, RepairRequestUpdate
 from src.repair_request.repository import RepairRequestRepository, FileRepository
 from src.repair_request.schemas import RepairRequest, File
 from src.repository import CRUDRepository
 from src.services import GenericServices
+from src.spare_part.repository import SparePartRepository
+from src.spare_part.services import SparePartServices
 
 ALLOWED_PHOTO_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "bmp", "gif", "tiff", "tif"}
 ALLOWED_PHOTO_MIME = {"image/jpeg", "image/png", "image/webp", "image/gif"}
@@ -30,7 +33,8 @@ def form_url_to_file(static_dir: str, filename: str) -> str:
 class RepairRequestServices(GenericServices[RepairRequest, RepairRequestInfo]):
     def __init__(self, proxy_url_to_static_files_dir: str, static_files_dir: str):
         super().__init__(RepairRequestRepository(), RepairRequestInfo)
-        self.auth_repo = CRUDRepository(User)
+        self.spare_parts_services = SparePartServices()
+        self.auth_repo = AuthRepository()
         self.file_repo = FileRepository()
 
         self.static_files_dir = static_files_dir
@@ -149,17 +153,28 @@ class RepairRequestServices(GenericServices[RepairRequest, RepairRequestInfo]):
             data: dict,
             database: AsyncSession,
             background_tasks: BackgroundTasks | None = None,
+            mailer: MailerService | None = None,
             unique_fields: list[str] | None = None,
             relationship_fields: list[str] | None = None,
             overwrite_relationships: list[str] | None = None,
             preloads: list[str] | None = None,
     ) -> RepairRequestInfo:
+        model = RepairRequestUpdate.model_validate(data)
         repair_request = await self.repo.update(
             id_=id_,
             data=data,
             database=database,
             preloads=preloads,
         )
+
+        if model.used_spare_parts:
+            spare_part_ids = [x.spare_part_id for x in model.used_spare_parts]
+            await self.spare_parts_services.check_quantity(
+                ids=spare_part_ids,
+                database=database,
+                background_tasks=background_tasks,
+                mailer=mailer
+            )
 
         for photo in repair_request.photos:
             photo.file_path = form_url_to_file(self.proxy_url_to_static_files_dir, str(photo.file_path))

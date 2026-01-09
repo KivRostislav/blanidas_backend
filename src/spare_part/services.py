@@ -37,24 +37,25 @@ class SparePartServices(GenericServices[SparePart, SparePartInfo]):
             preloads: list[str] | None = None,
     ) -> SparePartInfo:
         spare_part = await self.repo.update(id_=id_, data=data, database=database, preloads=preloads)
+        await self.check_quantity(ids=[spare_part.id], database=database, background_tasks=background_tasks, mailer=mailer)
 
-        quantity = 0
-        for location in spare_part.locations:
-            quantity += location.quantity
-        if quantity <= spare_part.min_quantity and background_tasks and mailer:
-            receivers = (await self.auth_repo.fetch(database=database, limit=-1, filters={"receive_low_stock_notification": "true"}))[0]
-            for receiver in receivers:
-                await emit(
-                    event_name=EventTypes.low_stock.name,
-                    background_tasks=background_tasks,
-                    to=receiver.email,
-                    mailer=mailer,
-                    payload=LowStockMessagePayload(
-                        receiver_username=receiver.username,
-                        spare_part_name=spare_part.name,
-                        spare_part_current_quantity=quantity,
-                        spare_part_min_quantity=spare_part.min_quantity,
+        return SparePartInfo.model_validate(spare_part.__dict__, from_attributes=True)
+
+    async def check_quantity(self, ids: list[int], database: AsyncSession, background_tasks: BackgroundTasks, mailer: MailerService) -> None:
+        spare_parts = (await self.repo.fetch(database, filters={"id": { "in": str(ids) }}))[0]
+        for spare_part in spare_parts:
+            if spare_part.total_quantity <= spare_part.min_quantity:
+                receivers = (await self.auth_repo.fetch(database=database, filters={"receive_low_stock_notification": "true"}))[0]
+                for receiver in receivers:
+                    await emit(
+                        event_name=EventTypes.low_stock.name,
+                        background_tasks=background_tasks,
+                        to=receiver.email,
+                        mailer=mailer,
+                        payload=LowStockMessagePayload(
+                            receiver_username=receiver.username,
+                            spare_part_name=spare_part.name,
+                            spare_part_current_quantity=spare_part.total_quantity,
+                            spare_part_min_quantity=spare_part.min_quantity,
+                        )
                     )
-                )
-
-        return SparePartInfo.model_validate({quantity: quantity, **spare_part.__dict__}, from_attributes=True)

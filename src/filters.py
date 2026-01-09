@@ -57,11 +57,7 @@ def apply_filters(stmt: Select, filters: Filters, related_fields: FilterRelatedF
                 else column == cast_filter_value(column, value)
             )
 
-            stmt = stmt.where(
-                exists(
-                    select(1).where(condition)
-                )
-            )
+            stmt = stmt.where(exists(select(1).where(condition)))
             continue
 
         if isinstance(value, dict):
