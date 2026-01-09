@@ -1,13 +1,16 @@
 import json
+from typing import Annotated
 
 from fastapi import APIRouter
 from fastapi.params import Depends
 from fastapi.temp_pydantic_v1_params import Query
 
+from src.auth.schemas import Role
 from src.database import DatabaseSession
 from src.decorators import domain_errors
 from src.pagination import Pagination
 from src.pagination import PaginationResponse
+from src.auth.dependencies import allowed
 from src.sorting import Sorting
 from src.spare_part_category.errors import errors_map
 from src.spare_part_category.models import SparePartCategoryInfo, SparePartCategoryCreate, SparePartCategoryUpdate
@@ -19,6 +22,7 @@ services = SparePartCategoryServices()
 @router.get("/", response_model=PaginationResponse[SparePartCategoryInfo])
 async def get_spare_part_category_list_endpoint(
         database: DatabaseSession,
+        _: Annotated[None, Depends(allowed(role=Role.manager))],
         pagination: Pagination = Depends(),
         sorting: Sorting = Depends(),
         filters: str | None = Query(None),
@@ -32,15 +36,15 @@ async def get_spare_part_category_list_endpoint(
 
 @router.post("/", response_model=SparePartCategoryInfo)
 @domain_errors(errors_map)
-async def create_spare_part_category_endpoint(model: SparePartCategoryCreate, database: DatabaseSession) -> SparePartCategoryInfo:
+async def create_spare_part_category_endpoint(model: SparePartCategoryCreate, database: DatabaseSession, _: Annotated[None, Depends(allowed(role=Role.manager))]) -> SparePartCategoryInfo:
     return await services.create(data=model.model_dump(exclude_none=True), database=database)
 
 @router.put("/", response_model=SparePartCategoryInfo)
 @domain_errors(errors_map)
-async def update_spare_part_category_endpoint(model: SparePartCategoryUpdate, database: DatabaseSession) -> SparePartCategoryInfo:
+async def update_spare_part_category_endpoint(model: SparePartCategoryUpdate, database: DatabaseSession, _: Annotated[None, Depends(allowed(role=Role.manager))]) -> SparePartCategoryInfo:
     return await services.update(id_=model.id, data=model.model_dump(exclude_none=True), database=database)
 
 @router.delete("/{id_}", response_model=int)
 @domain_errors(errors_map)
-async def delete_spare_part_category_endpoint(id_: int, database: DatabaseSession) -> int:
+async def delete_spare_part_category_endpoint(id_: int, database: DatabaseSession, _: Annotated[None, Depends(allowed(role=Role.manager))]) -> int:
     return await services.delete(id_=id_, database=database)

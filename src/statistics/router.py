@@ -3,6 +3,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 
+from src.auth.dependencies import allowed
+from src.auth.schemas import Role
 from src.database import DatabaseSession
 from src.statistics.models import StatisticsTimeStep, TimeFrame, StatisticsResponse
 from src.statistics.services import StatisticsServices
@@ -25,6 +27,7 @@ def get_timeframe(
 async def get_statistics_endpoint(
         database: DatabaseSession,
         timeframe: Annotated[TimeFrame, Depends(get_timeframe)],
+        _: Annotated[None, Depends(allowed(role=Role.manager))]
 ) -> StatisticsResponse:
     return await StatisticsServices.get(database=database, data=timeframe.model_dump())
 

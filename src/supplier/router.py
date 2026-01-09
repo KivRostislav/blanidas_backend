@@ -1,9 +1,12 @@
 import json
+from typing import Annotated
 
 from fastapi import APIRouter
 from fastapi.params import Depends, Query
 
+from src.auth.schemas import Role
 from src.database import DatabaseSession
+from src.auth.dependencies import allowed
 from src.decorators import domain_errors
 from src.pagination import Pagination, PaginationResponse
 from src.sorting import Sorting
@@ -17,6 +20,7 @@ services = SupplierServices()
 @router.get("/", response_model=PaginationResponse[SupplierInfo])
 async def get_supplier_list_endpoint(
         database: DatabaseSession,
+        _: Annotated[None, Depends(allowed(role=Role.manager))],
         pagination: Pagination = Depends(),
         sorting: Sorting = Depends(),
         filters: str | None = Query(None),
@@ -30,15 +34,15 @@ async def get_supplier_list_endpoint(
 
 @router.post("/", response_model=SupplierInfo)
 @domain_errors(errors_map)
-async def create_supplier_endpoint(model: SupplierCreate, database: DatabaseSession) -> SupplierInfo:
+async def create_supplier_endpoint(model: SupplierCreate, database: DatabaseSession, _: Annotated[None, Depends(allowed(role=Role.manager))]) -> SupplierInfo:
     return await services.create(data=model.model_dump(exclude_none=True), database=database)
 
 @router.put("/", response_model=SupplierInfo)
 @domain_errors(errors_map)
-async def update_supplier_endpoint(model: SupplierUpdate, database: DatabaseSession) -> SupplierInfo:
+async def update_supplier_endpoint(model: SupplierUpdate, database: DatabaseSession, _: Annotated[None, Depends(allowed(role=Role.manager))]) -> SupplierInfo:
     return await services.update(id_=model.id, data=model.model_dump(exclude_none=True), database=database)
 
 @router.delete("/{id_}", response_model=int)
 @domain_errors(errors_map)
-async def delete_supplier_endpoint(id_: int, database: DatabaseSession) -> int:
+async def delete_supplier_endpoint(id_: int, database: DatabaseSession, _: Annotated[None, Depends(allowed(role=Role.manager))]) -> int:
     return await services.delete(id_=id_, database=database)

@@ -1,4 +1,5 @@
 import json
+from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks
 from fastapi.params import Depends, Query
@@ -7,6 +8,7 @@ from src.decorators import domain_errors
 from src.sorting import Sorting
 from src.database import DatabaseSession
 from src.pagination import Pagination
+from src.auth.dependencies import allowed
 from src.pagination import PaginationResponse
 from src.mailer.dependencies import MailerServiceDep
 from src.spare_part.errors import errors_map
@@ -19,6 +21,7 @@ services = SparePartServices()
 @router.get("/", response_model=PaginationResponse[SparePartInfo])
 async def get_spare_part_list_endpoint(
         database: DatabaseSession,
+        _: Annotated[None, Depends(allowed())],
         pagination: Pagination = Depends(),
         sorting: Sorting = Depends(),
         filters: str | None = Query(None),
@@ -41,7 +44,7 @@ async def get_spare_part_list_endpoint(
 
 @router.post("/", response_model=SparePartInfo)
 @domain_errors(errors_map)
-async def create_spare_part_endpoint(model: SparePartCreate, database: DatabaseSession) -> SparePartInfo:
+async def create_spare_part_endpoint(model: SparePartCreate, database: DatabaseSession, _: Annotated[None, Depends(allowed())]) -> SparePartInfo:
     return await services.create(
         data=model.model_dump(exclude_none=True),
         database=database,
@@ -58,7 +61,13 @@ async def create_spare_part_endpoint(model: SparePartCreate, database: DatabaseS
 
 @router.put("/", response_model=SparePartInfo)
 @domain_errors(errors_map)
-async def update_spare_part_endpoint(model: SparePartUpdate, database: DatabaseSession, mailer: MailerServiceDep, background_task: BackgroundTasks) -> SparePartInfo:
+async def update_spare_part_endpoint(
+        model: SparePartUpdate,
+        database: DatabaseSession,
+        mailer: MailerServiceDep,
+        background_task: BackgroundTasks,
+        _: Annotated[None, Depends(allowed())]
+) -> SparePartInfo:
     return await services.update(
         id_=model.id,
         data=model.model_dump(exclude_none=True),
@@ -78,5 +87,5 @@ async def update_spare_part_endpoint(model: SparePartUpdate, database: DatabaseS
 
 @router.delete("/{id_}", response_model=int)
 @domain_errors(errors_map)
-async def delete_spare_part_endpoint(id_: int, database: DatabaseSession) -> int:
+async def delete_spare_part_endpoint(id_: int, database: DatabaseSession, _: Annotated[None, Depends(allowed())]) -> int:
     return await services.delete(id_=id_, database=database)

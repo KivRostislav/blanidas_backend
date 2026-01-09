@@ -1,9 +1,12 @@
 import json
+from typing import Annotated
 
 from fastapi import APIRouter
 from fastapi.params import Depends, Query
 
+from src.auth.schemas import Role
 from src.database import DatabaseSession
+from src.auth.dependencies import allowed
 from src.decorators import domain_errors
 from src.institution_type.errors import errors_map
 
@@ -18,6 +21,7 @@ services = InstitutionTypeServices()
 @router.get("/", response_model=PaginationResponse[InstitutionTypeInfo])
 async def get_institution_type_list_endpoint(
         database: DatabaseSession,
+        _: Annotated[None, Depends(allowed(role=Role.manager))],
         pagination: Pagination = Depends(),
         sorting: Sorting = Depends(),
         filters: str | None = Query(None),
@@ -31,15 +35,15 @@ async def get_institution_type_list_endpoint(
 
 @router.post("/", response_model=InstitutionTypeInfo)
 @domain_errors(errors_map)
-async def create_institution_type_endpoint(model: InstitutionTypeCreate, database: DatabaseSession) -> InstitutionTypeInfo:
+async def create_institution_type_endpoint(model: InstitutionTypeCreate, database: DatabaseSession, _: Annotated[None, Depends(allowed(role=Role.manager))]) -> InstitutionTypeInfo:
     return await services.create(data=model.model_dump(exclude_none=True), database=database)
 
 @router.put("/", response_model=InstitutionTypeInfo)
 @domain_errors(errors_map)
-async def update_institution_type_endpoint(model: InstitutionTypeUpdate, database: DatabaseSession) -> InstitutionTypeInfo:
+async def update_institution_type_endpoint(model: InstitutionTypeUpdate, database: DatabaseSession, _: Annotated[None, Depends(allowed(role=Role.manager))]) -> InstitutionTypeInfo:
     return await services.update(id_=model.id, data=model.model_dump(exclude_none=True), database=database)
 
 @router.delete("/{id_}", response_model=int)
 @domain_errors(errors_map)
-async def delete_institution_type_endpoint(id_: int, database: DatabaseSession) -> int:
+async def delete_institution_type_endpoint(id_: int, database: DatabaseSession, _: Annotated[None, Depends(allowed(role=Role.manager))]) -> int:
     return await services.delete(id_=id_, database=database)
