@@ -20,7 +20,7 @@ services = SupplierServices()
 @router.get("/", response_model=PaginationResponse[SupplierInfo])
 async def get_supplier_list_endpoint(
         database: DatabaseSession,
-        _: Annotated[None, Depends(allowed(role=Role.manager))],
+        _: Annotated[None, Depends(allowed())],
         pagination: Pagination = Depends(),
         sorting: Sorting = Depends(),
         filters: str | None = Query(None),

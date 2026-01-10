@@ -69,9 +69,6 @@ class SparePart(BaseDatabaseModel):
     spare_part_category_id: Mapped[int | None] = mapped_column(ForeignKey("spare_part_category.id", ondelete="SET NULL"), nullable=True)
     spare_part_category: Mapped["SparePartCategory"] = relationship(back_populates="spare_parts", lazy="noload")
 
-    manufacturer_id: Mapped[int | None] = mapped_column(ForeignKey("manufacturer.id", ondelete="SET NULL"), nullable=True)
-    manufacturer: Mapped["Manufacturer"] = relationship(back_populates="spare_parts", lazy="noload")
-
     locations: Mapped[list["Location"]] = relationship(
         back_populates="spare_part",
         lazy="noload",

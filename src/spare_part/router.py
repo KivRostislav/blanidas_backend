@@ -36,7 +36,6 @@ async def get_spare_part_list_endpoint(
             "locations",
             "locations.institution",
             "locations.institution.institution_type",
-            "manufacturer",
             "spare_part_category",
             "supplier",
         ]
@@ -53,7 +52,6 @@ async def create_spare_part_endpoint(model: SparePartCreate, database: DatabaseS
             "locations",
             "locations.institution",
             "locations.institution.institution_type",
-            "manufacturer",
             "spare_part_category",
             "supplier",
         ]
@@ -78,7 +76,6 @@ async def update_spare_part_endpoint(
             "compatible_models",
             "supplier",
             "spare_part_category",
-            "manufacturer",
             "locations",
             "locations.institution",
             "locations.institution.institution_type",

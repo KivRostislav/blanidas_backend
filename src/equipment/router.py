@@ -41,7 +41,7 @@ async def get_equipment_list_endpoint(
 
 @router.get("/{id_}", response_model=EquipmentInfo)
 @domain_errors(errors_map)
-async def get_equipment_endpoint(id_: int, database: DatabaseSession, _: Annotated[None, Depends(allowed(role=Role.manager))]) -> EquipmentInfo:
+async def get_equipment_endpoint(id_: int, database: DatabaseSession) -> EquipmentInfo:
     return await services.get(
         id_=id_,
         database=database,

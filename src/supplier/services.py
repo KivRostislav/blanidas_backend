@@ -5,8 +5,8 @@ from src.sorting import SortingRelatedField, apply_sorting_wrapper, apply_sortin
 from src.supplier.models import SupplierInfo
 from src.supplier.schemas import Supplier
 
-filter_related_fields_map = {"name": FilterRelatedField(join=None, column=Supplier.name, use_exists=False)}
-sorting_related_fields_map = {"name": SortingRelatedField(join=None, column=Supplier.name)}
+filter_related_fields_map = {"name": FilterRelatedField(column=Supplier.name)}
+sorting_related_fields_map = {"name": SortingRelatedField(column=Supplier.name) }
 
 class SupplierServices(GenericServices[Supplier, SupplierInfo]):
     def __init__(self):

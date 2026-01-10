@@ -8,7 +8,9 @@ from src.repair_request.schemas import RepairRequest
 
 
 def apply_repair_request_filters(stmt: Select, filters: Filters, related_fields: FilterRelatedFieldsMap) -> Select:
-    or_conditions = get_filter_value(filters.pop("equipment_serial_number_or_equipment_equipment_model_name", None))
+    or_conditions = get_filter_value(filters.get("equipment_serial_number_or_equipment_equipment_model_name", None))
+    equipment_category_id = get_filter_value(filters.get("equipment_category_id", None))
+    equipment_institution_id = get_filter_value(filters.get("equipment_institution_id", None))
 
     stmt = apply_filters(stmt, filters, related_fields)
     if or_conditions:
@@ -23,5 +25,15 @@ def apply_repair_request_filters(stmt: Select, filters: Filters, related_fields:
                 )
             )
         )
+
+    equipment_alias = aliased(Equipment)
+    if equipment_institution_id or equipment_category_id:
+        stmt = stmt.join(equipment_alias, equipment_alias.id == RepairRequest.equipment_id)
+
+    if equipment_institution_id:
+        stmt = stmt.where(equipment_alias.institution_id == equipment_institution_id)
+
+    if equipment_category_id:
+        stmt = stmt.where(equipment_alias.equipment_category_id == equipment_category_id)
 
     return stmt

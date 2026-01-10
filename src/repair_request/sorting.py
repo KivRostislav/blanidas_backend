@@ -4,20 +4,23 @@ from sqlalchemy.orm import aliased
 from src.equipment.schemas import Equipment
 from src.equipment_model.schemas import EquipmentModel
 from src.sorting import Sorting, SortingRelatedFieldsMap, SortOrder, apply_sorting
-from src.repair_request.schemas import RepairRequest, RepairRequestStatusRecord, RepairRequestStatus
+from src.repair_request.schemas import RepairRequest, RepairRequestStatus, Urgency
 
 
 def apply_repair_request_sorting(stmt: Select, sorting: Sorting, related_fields: SortingRelatedFieldsMap) -> Select:
     if sorting.sort_by == "equipment_model_name":
-        subq = (
-            select(RepairRequest, EquipmentModel.name.label("model_name"))
-            .join(Equipment, RepairRequest.equipment_id == Equipment.id)
-            .join(EquipmentModel, Equipment.equipment_model_id == EquipmentModel.id)
-            .subquery()
-        )
+        equipment_alias = aliased(Equipment)
+        equipment_model_alias = aliased(EquipmentModel)
 
-        stmt = select(subq).order_by(
-            subq.c.model_name.desc() if sorting.sort_order == SortOrder.descending else subq.c.model_name.asc()
+
+        stmt = (stmt
+            .join(equipment_alias, RepairRequest.equipment_id == equipment_alias.id)
+            .join(equipment_model_alias, equipment_alias.equipment_model_id == equipment_model_alias.id)
+            .order_by(
+                equipment_model_alias.name.desc()
+                if sorting.sort_order == SortOrder.descending
+                else equipment_model_alias.name.asc()
+            )
         )
 
     if sorting.sort_by == "status":
@@ -29,6 +32,11 @@ def apply_repair_request_sorting(stmt: Select, sorting: Sorting, related_fields:
         )
 
         stmt = stmt.order_by(status_order.desc() if sorting.sort_order == SortOrder.descending else status_order.asc())
+
+    if sorting.sort_by == "urgency":
+        urgency_case = case((RepairRequest.urgency == Urgency.critical, 1), else_=0)
+        stmt = stmt.order_by(urgency_case.desc() if sorting.sort_order == SortOrder.descending else urgency_case.asc())
+
 
     stmt = apply_sorting(stmt, sorting, related_fields)
     return stmt

@@ -52,7 +52,7 @@ class AuthServices(GenericServices[User, UserInfo]):
     async def login(self, data: dict[str, Any], jwt_settings: JWTSettings, database: AsyncSession) -> LoginResponse:
         user = await self.repo.get_by_email(data["email"], database=database, preloads=["workplace"])
 
-        if not user and not password_hash.verify(data["password"], str(user.password_hash)):
+        if not user or not password_hash.verify(data["password"], str(user.password_hash)):
             raise DomainError(code=DomainErrorCode.authentication, field="email, password")
 
         payload = generate_payload(user)

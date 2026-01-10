@@ -5,8 +5,8 @@ from src.sorting import SortingRelatedField, apply_sorting_wrapper, apply_sortin
 from src.spare_part_category.models import SparePartCategoryInfo
 from src.spare_part_category.schemas import SparePartCategory
 
-filter_related_fields_map = {"name": FilterRelatedField(join=None, column=SparePartCategory.name, use_exists=False)}
-sorting_related_fields_map = {"name": SortingRelatedField(join=None, column=SparePartCategory.name)}
+filter_related_fields_map = {"name": FilterRelatedField(column=SparePartCategory.name)}
+sorting_related_fields_map = {"name": SortingRelatedField(column=SparePartCategory.name)}
 
 class SparePartCategoryServices(GenericServices[SparePartCategory, SparePartCategoryInfo]):
     def __init__(self):

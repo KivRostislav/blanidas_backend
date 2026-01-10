@@ -22,7 +22,7 @@ services = SparePartCategoryServices()
 @router.get("/", response_model=PaginationResponse[SparePartCategoryInfo])
 async def get_spare_part_category_list_endpoint(
         database: DatabaseSession,
-        _: Annotated[None, Depends(allowed(role=Role.manager))],
+        _: Annotated[None, Depends(allowed())],
         pagination: Pagination = Depends(),
         sorting: Sorting = Depends(),
         filters: str | None = Query(None),

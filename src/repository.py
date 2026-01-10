@@ -48,8 +48,7 @@ class CRUDRepository(Generic[ModelType]):
             stmt = stmt.options(*options)
 
         count_stmt = select(func.count(distinct(self.model.id))).select_from(self.model)
-        if filters:
-            count_stmt = self.filter_callback(count_stmt, filters)
+        count_stmt = self.filter_callback(count_stmt, filters)
 
         total = (await database.execute(count_stmt)).scalar() or 0
 

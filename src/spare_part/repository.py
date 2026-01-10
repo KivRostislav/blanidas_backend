@@ -15,18 +15,18 @@ from src.spare_part.models import SparePartCreate, SparePartUpdate
 from src.spare_part.schemas import SparePart, EquipmentModelSparePart, Location
 from src.spare_part.sorting import apply_spare_parts_sorting
 from src.utils import build_relation
-from src.filters import Filters, apply_filters_wrapper, FilterRelatedField
+from src.filters import apply_filters_wrapper, FilterRelatedField
 
 filter_related_fields_map = {
-    "name": FilterRelatedField(join=None, column=SparePart.name, use_exists=False),
-    "spare_part_category_id": FilterRelatedField(join=None, column=SparePart.spare_part_category_id, use_exists=False),
+    "name": FilterRelatedField(column=SparePart.name),
+    "spare_part_category_id": FilterRelatedField(column=SparePart.spare_part_category_id),
     "compatible_model_id": None,
     "institution_id": None,
     "stock_status": None,
 }
 
 sorting_related_fields_map = {
-    "name": SortingRelatedField(join=None, column=SparePart.name),
+    "name": SortingRelatedField(column=SparePart.name),
     "quantity": None,
     "stock_status": None,
 }
@@ -53,11 +53,7 @@ class SparePartRepository(CRUDRepository[SparePart]):
             }))
 
         await database.commit()
-
-        options = build_relation(SparePart, preloads)
-        stmt = select(SparePart).options(*options).where(SparePart.id == row_id)
-        result = await database.execute(stmt)
-        return result.scalars().first()
+        return await self.get(row_id, database, preloads)
 
     @integrity_errors()
     async def update(self, id_: int, data: dict, database: AsyncSession, preloads: list[str] | None = None) -> SparePart:
@@ -86,30 +82,6 @@ class SparePartRepository(CRUDRepository[SparePart]):
                 }))
 
         await database.commit()
-
-        stmt = (
-            select(SparePart)
-            .join(SparePart.supplier, isouter=True)
-            .join(SparePart.spare_part_category, isouter=True)
-            .join(SparePart.manufacturer, isouter=True)
-            .join(SparePart.compatible_models, isouter=True)
-            .join(SparePart.locations, isouter=True)
-            .join(Location.institution, isouter=True)
-            .join(Institution.institution_type, isouter=True)
-            .options(
-                contains_eager(SparePart.supplier),
-                contains_eager(SparePart.spare_part_category),
-                contains_eager(SparePart.manufacturer),
-                contains_eager(SparePart.compatible_models),
-                contains_eager(SparePart.locations)
-                .contains_eager(Location.institution)
-                .contains_eager(Institution.institution_type),
-            )
-
-            .order_by(Institution.name)
-            .where(SparePart.id == id_)
-        )
-        result = await database.execute(stmt)
-        return result.scalars().first()
+        return await self.get(id_, database, preloads)
 
 

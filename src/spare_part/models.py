@@ -1,9 +1,7 @@
-from pydantic import BaseModel, computed_field
-from enum import Enum
+from pydantic import BaseModel
 
 from src.equipment_model.models import EquipmentModelInfo
 from src.institution.models import InstitutionInfo
-from src.manufacturer.models import ManufacturerInfo
 from src.spare_part.schemas import StockStatus
 from src.spare_part_category.models import SparePartCategoryInfo
 from src.supplier.models import SupplierInfo
@@ -29,7 +27,6 @@ class SparePartInfo(BaseModel):
     locations: list[LocationInfo]
     supplier: SupplierInfo | None
     spare_part_category: SparePartCategoryInfo | None
-    manufacturer: ManufacturerInfo | None
 
 class SparePartCreate(BaseModel):
     name: str
@@ -38,7 +35,6 @@ class SparePartCreate(BaseModel):
 
     supplier_id: int
     spare_part_category_id: int
-    manufacturer_id: int
 
 class SparePartUpdate(BaseModel):
     id: int
@@ -52,7 +48,6 @@ class SparePartUpdate(BaseModel):
     institution_id: int | None = None
     supplier_id: int | None = None
     spare_part_category_id: int | None = None
-    manufacturer_id: int | None = None
 
 class SparePartDelete(BaseModel):
     id: int

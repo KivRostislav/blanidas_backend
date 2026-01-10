@@ -1,7 +1,7 @@
 import dataclasses
 from enum import Enum
-from typing import Callable
-from sqlalchemy import and_, Select, exists, select
+from typing import Callable, Any
+from sqlalchemy import and_, Select, exists, select, ColumnElement
 from sqlalchemy.orm import InstrumentedAttribute
 
 OPERATORS = {
@@ -20,9 +20,12 @@ OPERATORS = {
 
 @dataclasses.dataclass
 class FilterRelatedField:
-    join: InstrumentedAttribute | None
     column: InstrumentedAttribute
-    use_exists: bool
+
+    use_exists: bool = False
+    exists_from: Any | None = None
+    join: InstrumentedAttribute | None = None
+    exists_condition: Callable[[Any], InstrumentedAttribute] | None = None
 
 FilterRelatedFieldsMap = dict[str, FilterRelatedField | None]
 Filters =  dict[str, str | dict[str, str]]
@@ -51,13 +54,14 @@ def apply_filters(stmt: Select, filters: Filters, related_fields: FilterRelatedF
                 joins.add(related_field.join)
 
         if related_field.use_exists:
-            condition = (
-                build_operator(column, value)
-                if isinstance(value, dict)
-                else column == cast_filter_value(column, value)
+            subq = (
+                select(1)
+                .select_from(related_field.exists_from)
+                .where(related_field.exists_condition)
+                .correlate(None)
             )
 
-            stmt = stmt.where(exists(select(1).where(condition)))
+            stmt = stmt.where(exists(subq))
             continue
 
         if isinstance(value, dict):

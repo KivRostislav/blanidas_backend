@@ -24,19 +24,21 @@ from src.utils import build_relation
 
 
 filter_related_fields_map = {
-    "id": FilterRelatedField(join=None, column=RepairRequest.id, use_exists=False),
-    "equipment_id": FilterRelatedField(join=None, column=RepairRequest.equipment_id, use_exists=False),
-    "equipment_category_id": FilterRelatedField(join=None, column=Equipment.equipment_category_id, use_exists=True),
-    "equipment_institution_id": FilterRelatedField(join=None, column=Equipment.institution_id, use_exists=True),
-    "urgency": FilterRelatedField(join=None, column=RepairRequest.urgency, use_exists=True),
-    "status": FilterRelatedField(join=None, column=RepairRequest.last_status, use_exists=False),
+    "id": FilterRelatedField(column=RepairRequest.id),
+    "status": FilterRelatedField(column=RepairRequest.last_status),
+    "equipment_id": FilterRelatedField(column=RepairRequest.equipment_id),
+    "urgency": FilterRelatedField(column=RepairRequest.urgency),
+
+    "equipment_category_id": None,
+    "equipment_institution_id": None,
     "equipment_serial_number_or_equipment_equipment_model_name": None,
 }
 
 sorting_related_fields_map = {
-    "created_at": SortingRelatedField(join=None, column=RepairRequest.created_at),
-    "urgency": SortingRelatedField(join=None, column=RepairRequest.urgency),
-    "status": SortingRelatedField(join=None, column=RepairRequest.last_status),
+    "created_at": SortingRelatedField(column=RepairRequest.created_at),
+
+    "urgency": None,
+    "status": None,
     "equipment_model_name": None,
 }
 

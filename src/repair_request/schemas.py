@@ -95,5 +95,5 @@ class RepairRequest(BaseDatabaseModel):
         lazy="noload"
     )
 
-    equipment_id: Mapped[int | None] = mapped_column(ForeignKey("equipment.id", ondelete="SET NULL"), nullable=True)
+    equipment_id: Mapped[int] = mapped_column(ForeignKey("equipment.id", ondelete="CASCADE"), nullable=True)
     equipment: Mapped["Equipment"] = relationship(back_populates="repair_requests", lazy="noload")

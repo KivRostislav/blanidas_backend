@@ -17,8 +17,8 @@ class Sorting(BaseModel):
 
 @dataclasses.dataclass
 class SortingRelatedField:
-    join: InstrumentedAttribute | None
     column: InstrumentedAttribute
+    join: InstrumentedAttribute | None = None
 
 SortingRelatedFieldsMap = dict[str, SortingRelatedField]
 SortingCallback = Callable[[Select, Sorting], Select]

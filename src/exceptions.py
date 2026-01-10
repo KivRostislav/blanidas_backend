@@ -8,6 +8,8 @@ class ApiErrorCode(str, Enum):
     related_entity_not_found = "related entity not found"
     not_found = "not found"
 
+    authentication = "authentication"
+
     invalid_email_format = "invalid email format"
     invalid_phone_format = "invalid phone format"
     invalid_value = "invalid value"

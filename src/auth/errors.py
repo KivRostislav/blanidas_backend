@@ -6,5 +6,8 @@ errors_map: ErrorsMap = {
     },
     DomainErrorCode.not_entity: {
         "": ErrorMap(code=ApiErrorCode.not_found, message="Користувача з таким ідентифікатором не існує")
+    },
+    DomainErrorCode.authentication: {
+        "email, password": ErrorMap(code=ApiErrorCode.authentication, message="Не вдалось увійти.")
     }
 }
