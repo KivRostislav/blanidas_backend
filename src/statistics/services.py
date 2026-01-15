@@ -18,15 +18,8 @@ from src.manufacturer.schemas import Manufacturer
 from src.repair_request.schemas import RepairRequest, UsedSparePart, Urgency, RepairRequestStatus
 from src.spare_part.schemas import SparePart, StockStatus, Location
 from src.spare_part_category.schemas import SparePartCategory
-from src.statistics.models import StatisticsResponse, TimeFrame, StatisticsTimeStep, EquipmentBreakdownItem, \
-    CategoricalChartDataItem, TimelinePoint, StatisticsFilters
+from src.statistics.models import StatisticsResponse, EquipmentBreakdownItem, CategoricalChartDataItem, TimelinePoint, StatisticsFilters
 from src.supplier.schemas import Supplier
-
-time_slot_format = {
-    StatisticsTimeStep.hour: "%Y-%m-%d %H:00:00",
-    StatisticsTimeStep.day: "%Y-%m-%d",
-    StatisticsTimeStep.month: "%Y-%W-01",
-}
 
 class StatisticsServices:
     @staticmethod

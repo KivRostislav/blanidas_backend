@@ -4,10 +4,11 @@ from enum import Enum
 from pydantic import BaseModel
 
 class StatisticsTimeStep(str, Enum):
-    hour = "hour"
     day = "day"
     week = "week"
     month = "month"
+    year = "year"
+
 
 class TimeFrame(BaseModel):
     from_date: datetime
