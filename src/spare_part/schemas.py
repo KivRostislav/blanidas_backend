@@ -43,7 +43,6 @@ class SparePart(BaseDatabaseModel):
 
     name: Mapped[str] = mapped_column(unique=True)
     min_quantity: Mapped[int] = mapped_column()
-    note: Mapped[str | None] = mapped_column(nullable=True)
     total_quantity: Mapped[int] = column_property(total_quantity_expr)
 
     stock_status: Mapped[RepairRequestStatus] = column_property(

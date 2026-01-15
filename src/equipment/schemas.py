@@ -1,11 +1,10 @@
 from datetime import date
 from enum import Enum
 
-from sqlalchemy import ForeignKey, case, func, select
+from sqlalchemy import ForeignKey, case, func, select, DateTime
 from sqlalchemy.orm import Mapped, relationship, mapped_column, column_property
 
 from src.database import BaseDatabaseModel
-from src.models import StringToDate
 from src.repair_request.schemas import RepairRequest, RepairRequestStatus
 
 class EquipmentStatus(str, Enum):
@@ -27,7 +26,7 @@ class Equipment(BaseDatabaseModel):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     location: Mapped[str] = mapped_column()
     serial_number: Mapped[str] = mapped_column(unique=True)
-    installed: Mapped[date] = mapped_column(StringToDate)
+    installed: Mapped[date] = mapped_column(DateTime(timezone=True))
 
     status: Mapped[EquipmentStatus] = column_property(
         select(
@@ -45,7 +44,7 @@ class Equipment(BaseDatabaseModel):
     institution_id: Mapped[int] = mapped_column(ForeignKey("institution.id", ondelete="CASCADE"))
     institution: Mapped["Institution"] = relationship(back_populates="equipment", lazy="noload")
 
-    equipment_model_id: Mapped[int | None] = mapped_column(ForeignKey("equipment_model.id", ondelete="SET NULL"), nullable=True)
+    equipment_model_id: Mapped[int] = mapped_column(ForeignKey("equipment_model.id", ondelete="CASCADE"), nullable=True)
     equipment_model: Mapped["EquipmentModel"] = relationship(back_populates="equipment", lazy="noload")
 
     equipment_category_id: Mapped[int | None] = mapped_column(ForeignKey("equipment_category.id", ondelete="SET NULL"), nullable=True)

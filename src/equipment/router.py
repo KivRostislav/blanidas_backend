@@ -8,7 +8,7 @@ from src.auth.dependencies import allowed
 from src.auth.schemas import Role
 from src.decorators import domain_errors
 from src.equipment.errors import errors_map
-from src.equipment.models import EquipmentInfo, EquipmentCreate, EquipmentUpdate
+from src.equipment.models import EquipmentInfo, EquipmentCreate, EquipmentUpdate, EquipmentQrData
 from src.equipment.services import EquipmentServices
 from src.pagination import PaginationResponse, Pagination
 from src.database import DatabaseSession
@@ -38,6 +38,11 @@ async def get_equipment_list_endpoint(
             "institution.institution_type",
         ]
     )
+
+@router.get("/qr-codes", response_model=list[EquipmentQrData])
+@domain_errors(errors_map)
+async def get_equipment_qr_data_endpoint(database: DatabaseSession, _: Annotated[None, Depends(allowed(role=Role.manager))]) -> list[EquipmentQrData]:
+    return await services.get_qr_data(database=database)
 
 @router.get("/{id_}", response_model=EquipmentInfo)
 @domain_errors(errors_map)

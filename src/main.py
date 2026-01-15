@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from datetime import date
+from datetime import date, datetime
 
 from fastapi.exceptions import RequestValidationError
 from starlette.middleware.cors import CORSMiddleware
@@ -26,7 +26,7 @@ async def lifespan(_: FastAPI):
             phone_number="+380680000000",
             department="",
             workplace_id=None,
-            hire_at=date.today(),
+            hire_at=datetime.now(),
             email=settings.superuser_email,
             password=settings.superuser_password,
             role=auth_schemas.Role.manager,
@@ -45,7 +45,7 @@ app.exception_handler(RequestValidationError)(validation_exception_handler)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:5175"],
+    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://192.168.0.107:5174"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

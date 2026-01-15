@@ -1,15 +1,26 @@
-from sqlalchemy import select, func, desc
-from sqlalchemy.ext.asyncio import AsyncSession
+import datetime
+import math
+from io import BytesIO
+from typing import Any
 
-from src.equipment.schemas import Equipment
+import pandas
+from sqlalchemy import select, func, desc, and_
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
+from starlette.responses import StreamingResponse
+
+from src.equipment.schemas import Equipment, EquipmentStatus
+from src.equipment_category.schemas import EquipmentCategory
 from src.equipment_model.schemas import EquipmentModel
 from src.failure_type.schemas import FailureType, FailureTypeRepairRequest
 from src.institution.schemas import Institution
-from src.repair_request.schemas import RepairRequest
-from src.statistics.models import CenterBreakdownItem, StatisticsResponse, TimeFrame, \
-    CenterBreakdown, FailureTypeItem, FailureTypes, ModelBreakdown, ModelBreakdownItem, StatisticsTimeStep, \
-    TimeDynamicsItem, TimeDynamics, AvgRepairTimeItem, AvgRepairTime, EquipmentBreakdownItem, EquipmentBreakdown, \
-    CategoricalChartDataItem
+from src.manufacturer.schemas import Manufacturer
+from src.repair_request.schemas import RepairRequest, UsedSparePart, Urgency, RepairRequestStatus
+from src.spare_part.schemas import SparePart, StockStatus, Location
+from src.spare_part_category.schemas import SparePartCategory
+from src.statistics.models import StatisticsResponse, TimeFrame, StatisticsTimeStep, EquipmentBreakdownItem, \
+    CategoricalChartDataItem, TimelinePoint, StatisticsFilters
+from src.supplier.schemas import Supplier
 
 time_slot_format = {
     StatisticsTimeStep.hour: "%Y-%m-%d %H:00:00",
@@ -19,168 +30,437 @@ time_slot_format = {
 
 class StatisticsServices:
     @staticmethod
-    async def get(database: AsyncSession, data: dict) -> StatisticsResponse:
-        query_institution = await database.execute(
-            select(
-                Institution.name.label("institution_name"),
-                func.count(RepairRequest.id).label("breakdown_count")
-            )
+    async def get_institution(database: AsyncSession, data: StatisticsFilters, limit: int) -> list[CategoricalChartDataItem]:
+        query = (
+            select(Institution.name, func.count(RepairRequest.id).label("breakdown_count"))
+            .select_from(Institution)
             .join(Equipment, Equipment.institution_id == Institution.id)
             .join(RepairRequest, RepairRequest.equipment_id == Equipment.id)
-            .where(RepairRequest.created_at.between(data["from_date"], data["to_date"]))
-            .group_by(Institution.id)
-            .order_by(desc("breakdown_count"))
-            .limit(10)
         )
 
-        institution_items = [
-            CategoricalChartDataItem(
-                label=row[0],
-                value=row[1]
-            ) for row in query_institution.all()
-        ]
+        from_date = func.date_trunc(data.time_frame.step, data.time_frame.from_date)
+        to_date = func.date_trunc(data.time_frame.step, data.time_frame.to_date)
+        filters = [func.date_trunc(data.time_frame.step, RepairRequest.created_at).between(from_date, to_date)]
 
+        if data.institution_ids:
+            filters.append(Institution.id.in_(data.institution_ids))
 
-        query_failure_types = await database.execute(
+        if data.equipment_model_ids:
+            query = query.join(EquipmentModel, Equipment.equipment_model_id == EquipmentModel.id)
+            filters.append(EquipmentModel.id.in_(data.equipment_model_ids))
+
+        if data.failure_type_ids:
+            query = query.join(FailureTypeRepairRequest, RepairRequest.id == FailureTypeRepairRequest.repair_request_id)
+            query = query.join(FailureType, FailureTypeRepairRequest.failure_type_id == FailureType.id)
+            filters.append(FailureType.id.in_(data.failure_type_ids))
+
+        query = query.where(*filters)
+        query = query.group_by(Institution.id).order_by(desc("breakdown_count")).limit(limit)
+        query_institution = await database.execute(query)
+
+        return [CategoricalChartDataItem(label=row[0], value=row[1]) for row in query_institution.all()]
+
+    @staticmethod
+    async def get_failure_types(database: AsyncSession, data: StatisticsFilters, limit: int) -> list[CategoricalChartDataItem]:
+        query = (
             select(FailureType.name, func.count(RepairRequest.id).label("count"))
             .select_from(FailureType)
             .join(FailureTypeRepairRequest, FailureType.id == FailureTypeRepairRequest.failure_type_id)
             .join(RepairRequest, FailureTypeRepairRequest.repair_request_id == RepairRequest.id)
-            .where(RepairRequest.created_at.between(data["from_date"], data["to_date"]))
-            .group_by(FailureType.id)
-            .order_by(desc("count"))
-            .limit(10)
         )
 
-        failure_types_items = [
-            FailureTypeItem(
-                failure_type_id=row[0],
-                failure_type_name=row[1],
-                count=row[2]
-            )
-            for row in query_failure_types.all()
-        ]
+        from_date = func.date_trunc(data.time_frame.step, data.time_frame.from_date)
+        to_date = func.date_trunc(data.time_frame.step, data.time_frame.to_date)
+        filters = [func.date_trunc(data.time_frame.step, RepairRequest.created_at).between(from_date, to_date)]
 
-        query_models = (await database.execute(
-            select(
-                EquipmentModel.id,
-                EquipmentModel.name,
-                func.count(RepairRequest.id).label("count")
-            )
+        if data.institution_ids or data.equipment_model_ids:
+            query = query.join(Equipment, Equipment.id == RepairRequest.equipment_id)
+
+        if data.institution_ids:
+            query = query.join(Institution, Institution.id == Equipment.institution_id)
+            filters.append(Institution.id.in_(data.institution_ids))
+
+        if data.equipment_model_ids:
+            query = query.join(EquipmentModel, Equipment.equipment_model_id == EquipmentModel.id)
+            filters.append(EquipmentModel.id.in_(data.equipment_model_ids))
+
+        if data.failure_type_ids:
+            filters.append(FailureType.id.in_(data.failure_type_ids))
+
+        query = query.where(*filters)
+        query = query.group_by(FailureType.id).order_by(desc("count")).limit(limit)
+        query_failure_types = await database.execute(query)
+
+        return [CategoricalChartDataItem(label=row[0], value=row[1]) for row in query_failure_types.all()]
+
+    @staticmethod
+    async def get_equipment_models(database: AsyncSession, data: StatisticsFilters, limit: int) -> list[CategoricalChartDataItem]:
+        query = (
+            select(EquipmentModel.name, func.count(RepairRequest.id).label("count"))
             .select_from(EquipmentModel)
             .join(Equipment, EquipmentModel.id == Equipment.equipment_model_id)
             .join(RepairRequest, Equipment.id == RepairRequest.equipment_id)
-            .where(RepairRequest.created_at.between(data["from_date"], data["to_date"]))
-            .group_by(EquipmentModel.id)
-            .order_by(desc("count"))
-            .limit(10)
-        )).all()
-
-        models_items = [
-            ModelBreakdownItem(
-                model_id=row[0],
-                model_name=row[1],
-                breakdown_count=row[2]
-            )
-            for row in query_models
-        ]
-
-
-        if data["step"] == StatisticsTimeStep.week.value:
-            time_col = func.date(RepairRequest.created_at, 'weekday 1', '-6 days')
-        else:
-            time_col = func.strftime(time_slot_format[data["step"]], RepairRequest.created_at)
-
-        query_time = await database.execute(
-            select(time_col.label("time_slot"), func.count(RepairRequest.id).label("breakdown_count"))
-            .where(RepairRequest.created_at.between(data["from_date"], data["to_date"]))
-            .group_by("time_slot")
-            .order_by("time_slot")
         )
-        time_dynamics = [
-            TimeDynamicsItem(
-                unit=row[0],
-                breakdown_count=row[1]
-            )
-            for row in query_time.all()
-        ]
 
-        query_avg_repair_time = await database.execute(
+        from_date = func.date_trunc(data.time_frame.step, data.time_frame.from_date)
+        to_date = func.date_trunc(data.time_frame.step, data.time_frame.to_date)
+        filters = [func.date_trunc(data.time_frame.step, RepairRequest.created_at).between(from_date, to_date)]
+
+        if data.institution_ids:
+            query = query.join(Institution, Institution.id == Equipment.institution_id)
+            filters.append(Institution.id.in_(data.institution_ids))
+
+        if data.equipment_model_ids:
+            filters.append(EquipmentModel.id.in_(data.equipment_model_ids))
+
+        if data.failure_type_ids:
+            query = query.join(FailureTypeRepairRequest, RepairRequest.id == FailureTypeRepairRequest.repair_request_id)
+            query = query.join(FailureType, FailureTypeRepairRequest.failure_type_id == FailureType.id)
+            filters.append(FailureType.id.in_(data.failure_type_ids))
+
+        query = query.where(*filters)
+        query = query.group_by(EquipmentModel.id).order_by(desc("count")).limit(limit)
+        query_equipment_models = await database.execute(query)
+
+        return [CategoricalChartDataItem(label=row[0], value=row[1]) for row in query_equipment_models.all()]
+
+    @staticmethod
+    async def get_used_spare_parts(database: AsyncSession, data: StatisticsFilters, limit: int) -> list[CategoricalChartDataItem]:
+        query = (
+            select(SparePart.name, func.sum(UsedSparePart.quantity).label("count"))
+            .select_from(SparePart)
+            .join(UsedSparePart, UsedSparePart.spare_part_id == SparePart.id)
+            .join(RepairRequest, UsedSparePart.repair_request_id == RepairRequest.id)
+        )
+
+        from_date = func.date_trunc(data.time_frame.step, data.time_frame.from_date)
+        to_date = func.date_trunc(data.time_frame.step, data.time_frame.to_date)
+        filters = [func.date_trunc(data.time_frame.step, RepairRequest.created_at).between(from_date, to_date)]
+
+        if data.institution_ids or data.equipment_model_ids:
+            query = query.join(Equipment, Equipment.id == RepairRequest.equipment_id)
+
+        if data.institution_ids:
+            query = query.join(Institution, Institution.id == Equipment.institution_id)
+            filters.append(Institution.id.in_(data.institution_ids))
+
+        if data.equipment_model_ids:
+            query = query.join(EquipmentModel, Equipment.equipment_model_id == EquipmentModel.id)
+            filters.append(EquipmentModel.id.in_(data.equipment_model_ids))
+
+        if data.failure_type_ids:
+            query = query.join(FailureTypeRepairRequest, RepairRequest.id == FailureTypeRepairRequest.repair_request_id)
+            query = query.join(FailureType, FailureTypeRepairRequest.failure_type_id == FailureType.id)
+            filters.append(FailureType.id.in_(data.failure_type_ids))
+
+        query = query.where(*filters)
+        query = query.group_by(SparePart.name).order_by(desc("count")).limit(limit)
+        query_used_spare_parts = await database.execute(query)
+
+        return [CategoricalChartDataItem(label=row[0], value=row[1]) for row in query_used_spare_parts]
+
+    @staticmethod
+    async def get_time_dynamic(database: AsyncSession, data: StatisticsFilters, limit: int) -> list[TimelinePoint]:
+        time_col = func.date_trunc(data.time_frame.step, RepairRequest.created_at)
+        query = (select(time_col.label("time_slot"), func.count(RepairRequest.id)))
+
+        from_date = func.date_trunc(data.time_frame.step, data.time_frame.from_date)
+        to_date = func.date_trunc(data.time_frame.step, data.time_frame.to_date)
+        filters = [func.date_trunc(data.time_frame.step, RepairRequest.created_at).between(from_date, to_date)]
+
+        if data.institution_ids or data.equipment_model_ids:
+            query = query.join(Equipment, Equipment.id == RepairRequest.equipment_id)
+
+        if data.institution_ids:
+            query = query.join(Institution, Institution.id == Equipment.institution_id)
+            filters.append(Institution.id.in_(data.institution_ids))
+
+        if data.equipment_model_ids:
+            query = query.join(EquipmentModel, Equipment.equipment_model_id == EquipmentModel.id)
+            filters.append(EquipmentModel.id.in_(data.equipment_model_ids))
+
+        if data.failure_type_ids:
+            query = query.join(FailureTypeRepairRequest, RepairRequest.id == FailureTypeRepairRequest.repair_request_id)
+            query = query.join(FailureType, FailureTypeRepairRequest.failure_type_id == FailureType.id)
+            filters.append(FailureType.id.in_(data.failure_type_ids))
+
+        query = query.where(*filters)
+        query = query.group_by("time_slot").order_by("time_slot")
+        query_time = await database.execute(query)
+
+        return [TimelinePoint(period=row[0], count=row[1]) for row in query_time.all()]
+
+    @staticmethod
+    async def get_average_repair_time(database: AsyncSession, data: StatisticsFilters, limit: int) -> list[CategoricalChartDataItem]:
+        query = (
             select(
-                Institution.id,
                 Institution.name,
-                (
-                    func.avg(
-                        (func.julianday(RepairRequest.completed_at) -
-                         func.julianday(RepairRequest.created_at)) * 86400
-                    )
-                ).label("avg_repair_seconds")
+                func.avg(RepairRequest.completed_at - RepairRequest.created_at).label("average")
             )
             .select_from(Institution)
             .join(Equipment, Equipment.institution_id == Institution.id)
             .join(RepairRequest, RepairRequest.equipment_id == Equipment.id)
-            .where(RepairRequest.completed_at.is_not(None))
-            .group_by(Institution.id, Institution.name)
-            .order_by(desc("avg_repair_seconds"))
-            .limit(10)
         )
 
-        avg_repair_time_items = [
-            AvgRepairTimeItem(
-                center_id=row[0],
-                center_name=row[1],
-                avg_repair_seconds=row[2],
-            )
-            for row in query_avg_repair_time.all()
+        from_date = func.date_trunc(data.time_frame.step, data.time_frame.from_date)
+        to_date = func.date_trunc(data.time_frame.step, data.time_frame.to_date)
+
+        filters = [
+            func.date_trunc(data.time_frame.step, RepairRequest.created_at).between(from_date, to_date),
+            RepairRequest.completed_at.is_not(None)
         ]
 
-        query_equipment = await database.execute(
+        if data.institution_ids:
+            filters.append(Institution.id.in_(data.institution_ids))
+
+        if data.equipment_model_ids:
+            query = query.join(EquipmentModel, Equipment.equipment_model_id == EquipmentModel.id)
+            filters.append(EquipmentModel.id.in_(data.equipment_model_ids))
+
+        if data.failure_type_ids:
+            query = query.join(FailureTypeRepairRequest, RepairRequest.id == FailureTypeRepairRequest.repair_request_id)
+            query = query.join(FailureType, FailureTypeRepairRequest.failure_type_id == FailureType.id)
+            filters.append(FailureType.id.in_(data.failure_type_ids))
+
+        query = query.where(*filters)
+        query = query.group_by(Institution.name).order_by(desc("average")).limit(limit)
+        result = await database.execute(query)
+        return [CategoricalChartDataItem(label=row[0], value=row[1].total_seconds()) for row in result.all()]
+
+    @staticmethod
+    async def get_equipment_breakdowns(database: AsyncSession, data: StatisticsFilters, limit: int) -> list[EquipmentBreakdownItem]:
+        query = (
             select(
                 Equipment.serial_number,
-                EquipmentModel.name.label("model_name"),
-                Institution.name.label("center_name"),
+                EquipmentModel.name,
+                Institution.name,
                 func.count(RepairRequest.id).label("breakdown_count"),
-                func.avg(
-                    (func.julianday(RepairRequest.completed_at) -
-                     func.julianday(RepairRequest.created_at)) * 86400
-                ).label("avg_repair_seconds")
+                func.coalesce(func.avg(RepairRequest.completed_at - RepairRequest.created_at).label("avg_repair"), datetime.timedelta())
             )
             .select_from(Equipment)
             .join(EquipmentModel, EquipmentModel.id == Equipment.equipment_model_id)
             .join(Institution, Institution.id == Equipment.institution_id)
             .join(RepairRequest, RepairRequest.equipment_id == Equipment.id)
-            .where(RepairRequest.completed_at.is_not(None))
-            .group_by(
-                Equipment.id,
-                Equipment.serial_number,
-                EquipmentModel.name,
-                Institution.name
-            )
-            .order_by(desc("breakdown_count"))
-            .limit(10)
         )
 
-        equipment_items = [
+        from_date = func.date_trunc(data.time_frame.step, data.time_frame.from_date)
+        to_date = func.date_trunc(data.time_frame.step, data.time_frame.to_date)
+        filters = [func.date_trunc(data.time_frame.step, RepairRequest.created_at).between(from_date, to_date)]
+
+        if data.institution_ids:
+            filters.append(Institution.id.in_(data.institution_ids))
+
+        if data.equipment_model_ids:
+            filters.append(EquipmentModel.id.in_(data.equipment_model_ids))
+
+        if data.failure_type_ids:
+            query = query.join(FailureTypeRepairRequest, RepairRequest.id == FailureTypeRepairRequest.repair_request_id)
+            query = query.join(FailureType, FailureTypeRepairRequest.failure_type_id == FailureType.id)
+            filters.append(FailureType.id.in_(data.failure_type_ids))
+
+        query = query.where(*filters)
+        query = query.group_by(Equipment.id, Equipment.serial_number, EquipmentModel.name, Institution.name).order_by(desc("breakdown_count")).limit(limit)
+        result = await database.execute(query)
+        return [
             EquipmentBreakdownItem(
                 serial_number=row[0],
                 model_name=row[1],
-                center_name=row[2],
+                institution_name=row[2],
                 breakdown_count=row[3],
-                avg_repair_seconds=row[4],
+                average_repair_seconds=row[4].total_seconds(),
             )
-            for row in query_equipment.all()
+            for row in result.all()
         ]
 
+    @staticmethod
+    async def get_dashboard(database: AsyncSession, data: StatisticsFilters, limit: int = 7) -> StatisticsResponse:
         return StatisticsResponse(
-            center_breakdown=CenterBreakdown(items=institution_items),
-            failure_types=FailureTypes(items=failure_types_items),
-            model_breakdown=ModelBreakdown(items=models_items),
-            time_dynamics=TimeDynamics(items=time_dynamics),
-            average_repair_time=AvgRepairTime(items=avg_repair_time_items),
-            equipment_breakdown=EquipmentBreakdown(items=equipment_items),
-            time_frame=TimeFrame(
-                from_date=data["from_date"],
-                to_date=data["to_date"],
-                step=data["step"]
-            ),
+            institution_breakdown=await StatisticsServices.get_institution(database, data, limit),
+            failure_types=await StatisticsServices.get_failure_types(database, data, limit),
+            used_spare_parts=await StatisticsServices.get_used_spare_parts(database, data, limit),
+            model_breakdowns=await StatisticsServices.get_equipment_models(database, data, limit),
+            time_dynamics=await StatisticsServices.get_time_dynamic(database, data, limit),
+            average_repair_time=await StatisticsServices.get_average_repair_time(database, data, limit),
+            equipment_breakdowns=await StatisticsServices.get_equipment_breakdowns(database, data, limit),
+            time_frame=data.time_frame,
+        )
+
+    @staticmethod
+    async def generate_repair_request_sheet(database: AsyncSession) -> Any:
+        query = (
+            select(
+                RepairRequest.id,
+                RepairRequest.urgency,
+                RepairRequest.created_at,
+                RepairRequest.completed_at,
+                RepairRequest.last_status,
+                EquipmentModel.name,
+                Institution.name,
+                Equipment.location,
+                Equipment.serial_number,
+            )
+            .join(Equipment, Equipment.id == RepairRequest.equipment_id)
+            .join(EquipmentModel, EquipmentModel.id == Equipment.equipment_model_id)
+            .join(Institution, Institution.id == Equipment.institution_id)
+            .order_by(RepairRequest.created_at.desc())
+        )
+
+        repair_requests = (await database.execute(query)).all()
+
+        status_map = {
+            RepairRequestStatus.not_taken.value: "Новий",
+            RepairRequestStatus.in_progress.value: "У роботі",
+            RepairRequestStatus.waiting_spare_parts.value: "Очікує запчастини",
+            RepairRequestStatus.finished.value: "Виконано"
+        }
+
+        return [
+            {
+                "ID": item[0],
+                "Модель обладнання": item[5],
+                "Серійний номер": item[8],
+                "Заклад": item[6],
+                "Локація": item[7],
+                "Пріоритет": "Звичайний" if item[1] == Urgency.non_critical.value else "Критичний",
+                "Статус": status_map.get(item[4], "Невідомо"),
+                "Дата створення": item[2].replace(tzinfo=None),
+                "Дата завершення": item[3].replace(tzinfo=None) if item[3] else None,
+                "Час ремонту (сек)": (
+                    math.floor((item[3] - item[2]).total_seconds())
+                    if item[2] and item[3]
+                    else None
+                )
+            } for item in repair_requests
+        ]
+
+    @staticmethod
+    async def generate_spare_part_sheet(database: AsyncSession) -> Any:
+        query = (
+            select(
+                SparePart.id,
+                SparePart.name,
+                SparePartCategory.name,
+                Supplier.name,
+
+                SparePart.total_quantity,
+                SparePart.min_quantity,
+                SparePart.stock_status
+            )
+            .select_from(SparePart)
+            .join(SparePartCategory, SparePartCategory.id == SparePart.spare_part_category_id, isouter=True)
+            .join(Supplier, Supplier.id == SparePart.supplier_id, isouter=True)
+            .order_by(SparePart.name)
+        )
+
+        items = await database.execute(query)
+
+        stock_status_map = {
+            StockStatus.in_stock.value: "Є в наявності",
+            StockStatus.low_stock.value: "Мало",
+            StockStatus.out_of_stock.value: "Немає",
+        }
+
+        return [{
+            "ID": item[0],
+            "Назва запчастини": item[1],
+            "Категорія": item[2],
+            "Постачальник": item[3],
+            "Загальна кількість": item[4],
+            "Мінімальна кількість": item[5],
+            "Статус складу": stock_status_map.get(item[6], "Невідомо"),
+        } for item in items.all()]
+
+    @staticmethod
+    async def generate_spare_part_locations_sheet(database: AsyncSession) -> Any:
+        query = (
+            select(
+                SparePart.name,
+                Location.quantity,
+                Institution.name,
+            )
+            .join(Location, Location.spare_part_id == SparePart.id)
+            .join(Institution, Institution.id == Location.institution_id)
+            .order_by(SparePart.name, Location.quantity.desc())
+        )
+
+        items = await database.execute(query)
+        return [{
+            "Запчастина": item[0],
+            "Заклад": item[2],
+            "Кількість": item[1],
+        } for item in items.all()]
+
+    @staticmethod
+    async def generate_equipment_sheet(database: AsyncSession) -> Any:
+        query = (
+            select(
+                Equipment.id,
+                EquipmentModel.name,
+                Equipment.serial_number,
+                EquipmentCategory.name,
+                Manufacturer.name,
+                Institution.name,
+                Equipment.location,
+                Equipment.status,
+            )
+            .join(EquipmentCategory, EquipmentCategory.id == Equipment.equipment_category_id, isouter=True)
+            .join(EquipmentModel, EquipmentModel.id == Equipment.equipment_model_id, isouter=True)
+            .join(Manufacturer, Manufacturer.id == Equipment.manufacturer_id, isouter=True)
+            .join(Institution, Institution.id == Equipment.institution_id, isouter=True)
+            .order_by(EquipmentModel.name)
+        )
+
+        items = await database.execute(query)
+
+        equipment_status_map = {
+            EquipmentStatus.working.value: "Робоче",
+            EquipmentStatus.under_maintenance.value: "На обслуговуванні",
+            EquipmentStatus.not_working.value: "Не працює",
+        }
+
+        return [{
+            "ID": item[0],
+            "Модель": item[1],
+            "Серійний номер": item[2],
+            "Категорія": item[3],
+            "Виробник": item[4],
+            "Заклад": item[5],
+            "Локація": item[6],
+            "Статус": equipment_status_map.get(item[7], "Невідомий")
+        } for item in items]
+
+    @staticmethod
+    async def export_statistics_excel(database: AsyncSession, filters: StatisticsFilters) -> StreamingResponse:
+        dashboard = await StatisticsServices.get_dashboard(database, filters, limit=100)
+
+        sheets = {
+            "Заявки": await StatisticsServices.generate_repair_request_sheet(database),
+            "Запчастини": await StatisticsServices.generate_spare_part_sheet(database),
+            "Запчастини розміщення": await StatisticsServices.generate_spare_part_locations_sheet(database),
+            "Обладнання": await StatisticsServices.generate_equipment_sheet(database),
+        }
+
+        output = BytesIO()
+
+        with pandas.ExcelWriter(output, engine="openpyxl") as writer:
+            for sheet_name, data in sheets.items():
+                df = pandas.DataFrame(data)
+
+                for col in df.columns:
+                    if pandas.api.types.is_datetime64_any_dtype(df[col]):
+                        df[col] = df[col].dt.tz_localize(None)
+
+                df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+                worksheet = writer.sheets[sheet_name]
+                for i, col in enumerate(df.columns):
+                    max_len = max(df[col].astype(str).map(len).max(), len(col))
+                    worksheet.column_dimensions[worksheet.cell(row=1, column=i + 1).column_letter].width = max_len + 2
+
+        output.seek(0)
+
+        return StreamingResponse(
+            output,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": "attachment; filename=statistics.xlsx"}
         )

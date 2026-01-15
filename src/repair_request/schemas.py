@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import ForeignKey
+from sqlalchemy import ForeignKey, DateTime, func
 from sqlalchemy.orm import Mapped, relationship, mapped_column
 
 from src.database import BaseDatabaseModel
@@ -22,7 +22,7 @@ class RepairRequestStatusRecord(BaseDatabaseModel):
     __tablename__ = "repair_request_status_record"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    created_at: Mapped[datetime] = mapped_column()
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     status: Mapped[RepairRequestStatus] = mapped_column()
 
     assigned_engineer_id: Mapped[int | None] = mapped_column(ForeignKey("user.id", ondelete="SET NULL"), nullable=True)
@@ -63,8 +63,8 @@ class RepairRequest(BaseDatabaseModel):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     issue: Mapped[str] = mapped_column()
     urgency: Mapped[Urgency] = mapped_column()
-    created_at: Mapped[datetime] = mapped_column()
-    completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     last_status: Mapped[RepairRequestStatus] = mapped_column()
 

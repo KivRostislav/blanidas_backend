@@ -2,7 +2,7 @@ from sqlalchemy import select, func, distinct
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.equipment.filters import apply_equipment_filters
-from src.equipment.models import EquipmentStatus
+from src.equipment.models import EquipmentStatus, EquipmentQrData
 from src.equipment.schemas import Equipment
 from src.equipment_model.schemas import EquipmentModel
 from src.exceptions import DomainError, DomainErrorCode
@@ -35,42 +35,6 @@ class EquipmentRepository(CRUDRepository[Equipment]):
             sorting_callback=apply_sorting_wrapper(apply_sorting, sorting_related_fields_map),
        )
 
-    async def fetch(
-            self,
-            database: AsyncSession,
-            filters: Filters | None = None,
-            preloads: list[str] | None = None,
-            sorting: Sorting | None = None,
-            offset: int | None = None,
-            limit: int | None = None,
-    ) -> tuple[list[Equipment], int]:
-        filters = filters or {}
-        preloads = preloads or []
-
-        stmt = select(self.model)
-        stmt = self.filter_callback(stmt, filters)
-
-        if sorting:
-            stmt = self.sorting_callback(stmt, sorting)
-
-        if preloads:
-            options = build_relation(self.model, preloads)
-            stmt = stmt.options(*options)
-
-        count_stmt = select(func.count(distinct(self.model.id))).select_from(self.model)
-        if filters:
-            count_stmt = self.filter_callback(count_stmt, filters)
-
-        total = (await database.execute(count_stmt)).scalar() or 0
-
-        if limit is not None and limit != -1:
-            stmt = stmt.offset(offset or 0).limit(limit)
-
-        result = await database.execute(stmt)
-        items = result.unique().scalars().all()
-
-        return list(items), total
-
     async def get(self, id_: int, database: AsyncSession, preloads: list[str] | None = None) -> Equipment:
         options = build_relation(Equipment, preloads or [])
         stmt = select(Equipment).options(*options).where(Equipment.id == id_)
@@ -80,3 +44,9 @@ class EquipmentRepository(CRUDRepository[Equipment]):
             raise DomainError(code=DomainErrorCode.not_entity)
 
         return obj
+
+    async def get_qr_data(self, database: AsyncSession) -> list[EquipmentQrData]:
+        stmt = (select(Equipment.id, Equipment.serial_number, Institution.name.label("institution_name"))
+                .join(Institution, Institution.id == Equipment.institution_id))
+        rows = (await database.execute(stmt)).mappings().all()
+        return [EquipmentQrData(**row) for row in rows]

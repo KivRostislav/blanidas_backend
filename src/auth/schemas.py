@@ -1,7 +1,6 @@
 from datetime import date
-from typing import Optional
 
-from sqlalchemy import ForeignKey
+from sqlalchemy import ForeignKey, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from enum import Enum
@@ -29,7 +28,7 @@ class User(BaseDatabaseModel):
     workplace: Mapped["Institution | None"] = relationship(back_populates="users", lazy="noload")
 
     department: Mapped[str] = mapped_column()
-    hire_at: Mapped[date] = mapped_column()
+    hire_at: Mapped[date] = mapped_column(DateTime(timezone=True))
 
     receive_low_stock_notification: Mapped[bool] = mapped_column()
     receive_repair_request_created_notification: Mapped[bool] = mapped_column()

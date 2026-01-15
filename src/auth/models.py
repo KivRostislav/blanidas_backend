@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from enum import Enum
 from typing import Optional, List
 
@@ -19,7 +19,7 @@ class UserInfo(BaseModel):
     role: Role
     department: str
     workplace: InstitutionInfo | None = None
-    hire_at: date
+    hire_at: datetime
 
     receive_low_stock_notification: bool
     receive_repair_request_created_notification: bool
@@ -43,7 +43,7 @@ class UserCreate(BaseModel):
     role: Role
     department: str
     workplace_id: Optional[int]
-    hire_at: date
+    hire_at: datetime
 
     receive_low_stock_notification: bool
     receive_repair_request_created_notification: bool
@@ -58,7 +58,7 @@ class UserUpdate(BaseModel):
     role: Role | None = None
     department: str | None = None
     workplace_id: Optional[int] | None = None
-    hire_at: date | None = None
+    hire_at: datetime | None = None
 
     receive_low_stock_notification: bool
     receive_repair_request_created_notification: bool
