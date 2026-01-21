@@ -1,7 +1,4 @@
-from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, relationship, mapped_column
-
-from src.institution_type.schemas import InstitutionType
 from src.database import BaseDatabaseModel
 
 
@@ -14,9 +11,6 @@ class Institution(BaseDatabaseModel):
 
     contact_email: Mapped[str] = mapped_column()
     contact_phone: Mapped[str] = mapped_column()
-
-    institution_type_id: Mapped[int | None] = mapped_column(ForeignKey("institution_type.id", ondelete="SET NULL"), nullable=True)
-    institution_type: Mapped[InstitutionType | None] = relationship(back_populates="institutions", lazy="noload")
 
     equipment: Mapped[list["Equipment"]] = relationship(back_populates="institution", lazy="noload")
     users: Mapped[list["User"]] = relationship(back_populates="workplace", lazy="noload")

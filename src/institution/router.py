@@ -31,13 +31,12 @@ async def get_institution_list_endpoint(
         pagination=pagination,
         filters=json.loads(filters) if filters else None,
         sorting=None if sorting.sort_by == "" else sorting,
-        preloads=["institution_type"],
     )
 
 @router.post("/", response_model=InstitutionInfo)
 @domain_errors(errors_map)
 async def create_institution_endpoint(model: InstitutionCreate, database: DatabaseSession, _: Annotated[None, Depends(allowed(role=Role.manager))]) -> InstitutionInfo:
-    return await services.create(data=model.model_dump(exclude_none=True), database=database, preloads=["institution_type"])
+    return await services.create(data=model.model_dump(exclude_none=True), database=database)
 
 @router.put("/", response_model=InstitutionInfo)
 @domain_errors(errors_map)
@@ -46,7 +45,6 @@ async def update_institution_endpoint(model: InstitutionUpdate, database: Databa
         id_=model.id,
         data=model.model_dump(exclude_none=True),
         database=database,
-        preloads=["institution_type"]
     )
 
 @router.delete("/{id_}", response_model=int)

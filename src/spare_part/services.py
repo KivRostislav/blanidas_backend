@@ -1,16 +1,8 @@
-from statistics import quantiles
-from typing import Any
-
 from fastapi import BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.repository import AuthRepository
-from src.auth.schemas import User
-from src.equipment_model.schemas import EquipmentModel
 from src.event import emit, EventTypes
-from src.filters import FilterRelatedField, apply_filters_wrapper
-from src.pagination import PaginationResponse, Pagination
-from src.repository import CRUDRepository
 from src.services import GenericServices
 from src.mailer.smtp import MailerService
 from src.mailer.models import LowStockMessagePayload

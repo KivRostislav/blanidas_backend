@@ -1,20 +1,14 @@
-from math import ceil
-
-from sqlalchemy import select, inspect, func, update, delete, insert, distinct
+from sqlalchemy import update, delete, insert
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, contains_eager, selectinload
 
 from src.decorators import integrity_errors
-from src.institution.models import InstitutionInfo
-from src.sorting import Sorting, SortOrder, apply_sorting_wrapper, SortingRelatedField
+from src.sorting import apply_sorting_wrapper, SortingRelatedField
 from src.exceptions import DomainError, DomainErrorCode
-from src.institution.schemas import Institution
 from src.repository import CRUDRepository
 from src.spare_part.filters import apply_spare_parts_filters
 from src.spare_part.models import SparePartCreate, SparePartUpdate
 from src.spare_part.schemas import SparePart, EquipmentModelSparePart, Location
 from src.spare_part.sorting import apply_spare_parts_sorting
-from src.utils import build_relation
 from src.filters import apply_filters_wrapper, FilterRelatedField
 
 filter_related_fields_map = {

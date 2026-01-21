@@ -1,14 +1,7 @@
-from sqlalchemy import select, func, case, and_, Select
-from sqlalchemy.orm import aliased
+from sqlalchemy import Select, select
 
 from src.sorting import Sorting, SortingRelatedFieldsMap, SortOrder, apply_sorting
 from src.spare_part.schemas import SparePart, Location
-
-from sqlalchemy import select, func, case
-from sqlalchemy import func, case, and_
-from sqlalchemy import func, case, and_
-from sqlalchemy.orm import aliased
-from sqlalchemy import select, func, case
 
 
 from sqlalchemy import case, and_, func

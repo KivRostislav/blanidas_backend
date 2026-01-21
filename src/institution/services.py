@@ -6,10 +6,7 @@ from src.repository import CRUDRepository
 from src.services import GenericServices
 from src.sorting import SortingRelatedField, apply_sorting_wrapper, apply_sorting
 
-filterRelatedFieldsMap = {
-    "institution_type_id": FilterRelatedField(join=None, column=Institution.institution_type_id, use_exists=False),
-    "name_or_address": None
-}
+filterRelatedFieldsMap = {"name_or_address": None}
 
 sortingRelatedFieldsMap = {"name": SortingRelatedField(join=None, column=Institution.name)}
 

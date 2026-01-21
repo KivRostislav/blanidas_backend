@@ -35,9 +35,7 @@ async def get_spare_part_list_endpoint(
             "compatible_models",
             "locations",
             "locations.institution",
-            "locations.institution.institution_type",
             "spare_part_category",
-            "supplier",
         ]
     )
 
@@ -51,9 +49,7 @@ async def create_spare_part_endpoint(model: SparePartCreate, database: DatabaseS
             "compatible_models",
             "locations",
             "locations.institution",
-            "locations.institution.institution_type",
             "spare_part_category",
-            "supplier",
         ]
     )
 
@@ -74,11 +70,9 @@ async def update_spare_part_endpoint(
         background_tasks=background_task,
         preloads=[
             "compatible_models",
-            "supplier",
             "spare_part_category",
             "locations",
             "locations.institution",
-            "locations.institution.institution_type",
         ]
     )
 

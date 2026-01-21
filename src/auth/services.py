@@ -70,7 +70,7 @@ class AuthServices(GenericServices[User, UserInfo]):
 
         try:
             user = await self.repo.get(token_data["id"], database=database)
-        except HTTPException:
+        except DomainError:
             raise DomainError(code=DomainErrorCode.invalid_token, field="refresh_token")
 
         payload = generate_payload(user)
@@ -91,9 +91,12 @@ class AuthServices(GenericServices[User, UserInfo]):
 
         id_ = payload.get("id")
         payload_role = payload.get("role")
-        user = (await self.repo.get(id_, database=database))
-        if not user:
+
+        try:
+            user = (await self.repo.get(id_, database=database))
+        except DomainError:
             return IsAllowedReturnType(is_allowed=False, user=None)
+
         if role and payload_role != role:
             return IsAllowedReturnType(is_allowed=False, user=None)
         return IsAllowedReturnType(is_allowed=True, user=user)

@@ -19,7 +19,6 @@ from src.repair_request.schemas import RepairRequest, UsedSparePart, Urgency, Re
 from src.spare_part.schemas import SparePart, StockStatus, Location
 from src.spare_part_category.schemas import SparePartCategory
 from src.statistics.models import StatisticsResponse, EquipmentBreakdownItem, CategoricalChartDataItem, TimelinePoint, StatisticsFilters
-from src.supplier.schemas import Supplier
 
 class StatisticsServices:
     @staticmethod
@@ -333,7 +332,6 @@ class StatisticsServices:
                 SparePart.id,
                 SparePart.name,
                 SparePartCategory.name,
-                Supplier.name,
 
                 SparePart.total_quantity,
                 SparePart.min_quantity,
@@ -341,7 +339,6 @@ class StatisticsServices:
             )
             .select_from(SparePart)
             .join(SparePartCategory, SparePartCategory.id == SparePart.spare_part_category_id, isouter=True)
-            .join(Supplier, Supplier.id == SparePart.supplier_id, isouter=True)
             .order_by(SparePart.name)
         )
 
@@ -357,10 +354,9 @@ class StatisticsServices:
             "ID": item[0],
             "Назва запчастини": item[1],
             "Категорія": item[2],
-            "Постачальник": item[3],
-            "Загальна кількість": item[4],
-            "Мінімальна кількість": item[5],
-            "Статус складу": stock_status_map.get(item[6], "Невідомо"),
+            "Загальна кількість": item[3],
+            "Мінімальна кількість": item[4],
+            "Статус складу": stock_status_map.get(item[5], "Невідомо"),
         } for item in items.all()]
 
     @staticmethod

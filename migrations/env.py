@@ -14,11 +14,9 @@ from src.database import BaseDatabaseModel
 from src.config import AppSettings
 
 from src.institution.schemas import Institution
-from src.institution_type.schemas import InstitutionType
 from src.equipment_model.schemas import EquipmentModel
 from src.equipment_category.schemas import EquipmentCategory
 from src.manufacturer.schemas import Manufacturer
-from src.supplier.schemas import Supplier
 from src.equipment.schemas import Equipment
 from src.spare_part_category.schemas import SparePartCategory
 from src.spare_part.schemas import SparePart

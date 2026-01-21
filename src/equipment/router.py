@@ -35,7 +35,6 @@ async def get_equipment_list_endpoint(
             "equipment_category",
             "manufacturer",
             "institution",
-            "institution.institution_type",
         ]
     )
 
@@ -55,7 +54,6 @@ async def get_equipment_endpoint(id_: int, database: DatabaseSession) -> Equipme
             "equipment_category",
             "manufacturer",
             "institution",
-            "institution.institution_type",
         ]
     )
 
@@ -70,7 +68,6 @@ async def create_equipment_endpoint(model: EquipmentCreate, database: DatabaseSe
             "equipment_category",
             "manufacturer",
             "institution",
-            "institution.institution_type",
         ]
     )
 
@@ -86,7 +83,6 @@ async def update_equipment_endpoint(model: EquipmentUpdate, database: DatabaseSe
             "equipment_category",
             "manufacturer",
             "institution",
-            "institution.institution_type",
         ]
     )
 
